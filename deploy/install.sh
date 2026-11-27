@@ -86,7 +86,10 @@ restore() {
     done
     systemctl daemon-reload
     nginx -t && systemctl reload nginx
-    [[ $active == yes ]] && systemctl enable --now oceanacoustics.timer
+    if [[ $active == yes ]]; then
+        systemctl reset-failed oceanacoustics.service
+        systemctl enable --now oceanacoustics.timer
+    fi
     echo "Activation failed. Prior vhost and worker definitions restored. Volume and findings retained." >&2
     exit "$rc"
 }
@@ -147,7 +150,7 @@ Description=Ocean Acoustics bounded archive analysis
 RequiresMountsFor=$volume
 After=network-online.target
 Wants=network-online.target
-StartLimitIntervalSec=900
+StartLimitIntervalSec=300
 StartLimitBurst=3
 [Service]
 Type=oneshot
@@ -187,7 +190,7 @@ cat >"$units/oceanacoustics.timer" <<'EOF'
 [Unit]
 Description=Schedule delayed and historical ocean observations
 [Timer]
-OnBootSec=3min
+OnActiveSec=5min
 OnUnitInactiveSec=5min
 RandomizedDelaySec=20
 Unit=oceanacoustics.service
@@ -238,7 +241,10 @@ systemctl daemon-reload
 systemd-analyze verify "$units/oceanacoustics.service" "$units/oceanacoustics.timer"
 nginx -t
 systemctl reload nginx
-systemctl enable --now certbot.timer oceanacoustics.timer
+systemctl enable --now certbot.timer
+# A deliberate release check gets a fresh start budget. Arm the timer after health passes.
+systemctl reset-failed oceanacoustics.service
 systemctl start oceanacoustics.service
 curl -fsS --resolve "$site:443:127.0.0.1" "https://$site/data/observatory.json" >/dev/null
+systemctl enable --now oceanacoustics.timer
 echo "Origin HTTPS and worker passed. For rollback run this same script with argument rollback."
