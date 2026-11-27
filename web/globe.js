@@ -59,23 +59,15 @@ async function globeView(view){
   canvas.setAttribute("aria-label","Rotatable globe of acoustic recording stations. Select a station using the adjacent list.");
   const hint=el("div","globe-hint","Drag to rotate · Select a station");
   const zoom=el("div","globe-zoom");
-  const hello=el("button","pip-hello"),portrait=el("img");
-  portrait.src="/researcher.webp";portrait.alt="";portrait.width=58;portrait.height=58;
-  hello.append(portrait,el("span","","Hi, I’m Pip! Hear my picks ↓"));
-  hello.onclick=()=>{
-    const picks=document.getElementById("pip-picks");
-    picks?.scrollIntoView({block:"start"});picks?.querySelector("h2")?.focus({preventScroll:true});
-  };
-  map.append(canvas,hint,zoom,hello);const grid=el("div","atlas-grid");grid.append(map,side);panel.append(top,grid);view.append(panel);
+  map.append(canvas,hint,zoom);const grid=el("div","atlas-grid");grid.append(map,side);panel.append(top,grid);view.append(panel);
   side.append(el("p","small muted","Loading recording stations…"));
   let sites,land,gridPoints;
   try{
     landRequest??=fetch("/land.json").then(r=>{if(!r.ok)throw Error();return r.json();}).catch(()=>{landRequest=null;return null;});
     const [data,shape]=await Promise.all([fetch("/data/globe.json",{cache:"no-store",signal:AbortSignal.timeout(12000)}).then(r=>{if(!r.ok)throw Error();return r.json();}),landRequest]);
-    gridPoints=data.grid||[];sites=data.sites.filter(s=>s.clips.length);land=shape;
+    gridPoints=data.grid||[];sites=data.sites.map(s=>({...s,clips:s.clips.filter(c=>reviewedCatalog.has(c.id))})).filter(s=>s.clips.length);land=shape;
   }catch{side.replaceChildren(el("p","empty","The station map is awaiting a published snapshot."));return;}
   if(!view.isConnected)return;
-  if(!sites.length){side.replaceChildren(el("p","empty","No playable recordings yet."));return;}
   const projection=d3.geoOrthographic().translate([360,280]);
   const ctx=canvas.getContext("2d"),path=d3.geoPath(projection,ctx),graticule=d3.geoGraticule10();
   let hits=[],sampleHits=[];
@@ -201,5 +193,6 @@ async function globeView(view){
       }
     }drag=null;
   };
+  if(!sites.length){side.replaceChildren(el("p","empty","Listening reviews are pending."));draw();return;}
   chooseSite(sites.some(s=>s.id===atlas.site)?atlas.site:sites[0].id,false);
 }

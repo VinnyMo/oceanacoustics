@@ -106,7 +106,6 @@ def update(con,root,acquire=True,enable_ai=True):
                status='Monitoring',clips=st['events'])
     times=con.execute("""SELECT min(json_extract(payload,'$.processed_at')),max(json_extract(payload,'$.processed_at')),
                         count(*) FROM windows""").fetchone()
-    archive=[json.loads(r[0]) for r in con.execute('SELECT event FROM source_samples ORDER BY rowid DESC LIMIT 200')]
     events=[json.loads(r[0]) for r in con.execute('SELECT event FROM windows WHERE event IS NOT NULL UNION ALL SELECT event FROM source_samples')]
     quality=dict(distinct_seconds=st['coverage_seconds'],processed_hours=st['hours_analyzed'],
                  recurring_groups=st['recurring_groups'],candidates=st['events'],reviewed=st['reviewed'],
@@ -120,12 +119,14 @@ def update(con,root,acquire=True,enable_ai=True):
                     coalesce(sum(json_extract(event,'$.zero_fraction')=1),0) FROM source_samples""").fetchone()
     quality.update(source_quality_n=sq[0],rail_samples=sq[1],zero_source_samples=sq[2])
     mapped,grid=environment.enrich(con,events,acquire)
-    json_write(public/'globe.json',dict(generated_at=now(),sites=mapped,grid=grid))
     inventory=environment.inventory(con,events)
-    queue=analyst.ranked(events,con)
-    status=analyst.analyze(con,root,queue,quality,enable_ai)
-    quality['ai_attempts']=con.execute('SELECT count(*) FROM ai_notes').fetchone()[0]
-    quality['ai_completed']=con.execute("SELECT count(*) FROM ai_notes WHERE state='complete'").fetchone()[0]
+    status=analyst.review_cycle(con,root,events,quality,enable_ai)
+    quality['ai_attempts']=analyst.attempt_count(con)
+    reviewed={r[0] for r in con.execute("SELECT id FROM ai_notes WHERE state='complete'")}
+    quality['ai_completed']=len(reviewed)
+    for site in mapped:
+        site['clips']=[c for c in site['clips'] if c['id'] in reviewed]
+    json_write(public/'globe.json',dict(generated_at=now(),sites=mapped,grid=grid))
     notes=[]
     for r in con.execute("""SELECT id,model,requested,note FROM ai_notes WHERE state='complete'
                              ORDER BY json_extract(note,'$.priority') DESC,requested DESC LIMIT 50"""):
@@ -135,5 +136,6 @@ def update(con,root,acquire=True,enable_ai=True):
                           title=curator.catalog_note(event,note)['title']))
     quality.update(analyst.monthly_budget(con,now()))
     quality['cataloged']=curator.publish_catalog(con,public,events)
-    json_write(public/'research.json',dict(generated_at=now(),status=status,quality=quality,inventory=inventory,
-               notes=notes,queue=analyst.ranked(events,con)[:12],sources=[mbari,*sites],source_clips=archive))
+    picks=json.loads((public/'animal-first-picks.json').read_text())
+    json_write(public/'research.json',dict(featured_id=picks[0]['event']['id'] if picks else None,generated_at=now(),status=status,quality=quality,inventory=inventory,
+               notes=notes,queue=[],sources=[mbari,*sites],source_clips=[]))

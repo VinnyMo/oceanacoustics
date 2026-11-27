@@ -121,8 +121,8 @@ function facts(items,cls="facts") {
   }
   return dl;
 }
-const events=()=>Array.isArray(state?.events) ? state.events : [];
-const nameOf=e=>String(e.classification || "Unreviewed candidate").replaceAll("_"," ");
+const events=()=>Array.isArray(state?.events) ? state.events.filter(e=>reviewedCatalog.has(e.id)) : [];
+const nameOf=e=>{const genre=reviewedCatalog.get(e.id)?.genre;return genre&&genre!=="Unidentified"?"Possible source · "+genre:"Unidentified";};
 function httpsUrl(value) {
   try {const url = new URL(value);return url.protocol === "https:" ? url.href : null;}
   catch {return null;}
@@ -132,6 +132,8 @@ function isMbari(e) {
   return !!url && /^pacific-sound-[a-z0-9-]+\.s3(?:[.-][a-z0-9-]+)*\.amazonaws\.com$/.test(new URL(url).hostname);
 }
 function eventTitle(e) {
+  const title=reviewedCatalog.get(e.id)?.title;
+  if(title)return title;
   if(e.title)return e.title;
   if(e.classification==="Archive sample")return (e.location||e.provider||"Archive")+" excerpt";
   if(typeof e.frequency_hz==="number")return num(e.frequency_hz)+" Hz candidate";
@@ -170,18 +172,18 @@ function cards(entries, node,options) {
 }
 let activePick="";
 async function listeningPicks(view){
-  const section=el("section","panel picks"),header=el("div","picks-head"),heading=el("h2","","Pip’s five most interesting clips");
+  const section=el("section","panel picks"),header=el("div","picks-head"),heading=el("h2","","Pip’s listening picks");
   section.id="pip-picks";heading.tabIndex=-1;
   header.append(heading,link("Explore Pip’s research →","#research"));
   const body=el("div","picks-body","Loading Pip’s selections…");
   section.append(header,body);view.append(section);
   try{
-    const reply=await fetch("/data/picks.json",{cache:"no-store",signal:AbortSignal.timeout(12000)});
+    const reply=await fetch("/data/animal-first-picks.json",{cache:"no-store",signal:AbortSignal.timeout(12000)});
     if(!reply.ok)throw Error();
-    const picks=(await reply.json()).filter(p=>p?.event?.id&&media(p.event.audio_url)).slice(0,5);
+    const picks=(await reply.json()).filter(p=>p?.event?.id&&reviewedCatalog.has(p.event.id)&&media(p.event.audio_url)).slice(0,5);
     if(!section.isConnected)return;
     body.replaceChildren();
-    if(!picks.length){body.textContent="Pip’s first picks will appear after listening reviews are published.";return;}
+    if(!picks.length){body.textContent="Pip is listening for animal calls and distinctive acoustic patterns. Qualifying clips will appear here.";return;}
     const list=el("ol","pick-list"),feature=el("article","pick-feature");
     const buttons=[];
     function show(index){
@@ -189,7 +191,7 @@ async function listeningPicks(view){
       activePick=e.id;
       buttons.forEach((b,i)=>b.setAttribute("aria-pressed",String(i===index)));
       const title=el("h3");title.append(link(p.title,detailLink(e)));
-      feature.replaceChildren(el("p","label","Pip’s pick "+(index+1)+" · "+p.basis+" "+p.score+"/5"),title,
+      feature.replaceChildren(el("p","label","Pip’s pick "+(index+1)+" · "+(p.animal?"Possible "+p.genre.toLowerCase():p.character)+" · "+p.basis+" "+p.score+"/5"),title,
         el("p","small muted",[e.location,when(e.recorded_at)].filter(Boolean).join(" · ")),
         picture(e.spectrogram_url,"Spectrogram of "+p.title,""),el("p","pick-cue",p.observation),
         player(e),link("Open recording and field notes →",detailLink(e)),credit(e));
@@ -221,24 +223,17 @@ function observatory(view) {
     ...(latest.first_seen_lag_seconds!=null?[["Recording to project’s first observation",elapsed(latest.first_seen_lag_seconds)]]:[]),["Last reported processing status",state.status||"Unknown"],
     ["Historical coverage",num(stats.backfill_hours,3)+" h"]
   ]));grid.append(plot,site);view.append(grid);
-  const title=el("div","section-head");title.append(el("h2","","Recent acoustic detections"),link("Browse catalog →","#discoveries"));view.append(title);cards(events().slice(0,3),view);
+  const title=el("div","section-head");title.append(el("h2","","Recent detections reviewed by Pip"),link("Browse catalog →","#discoveries"));view.append(title);cards(events().slice(0,3),view);
 }
 let filter="", group="";
 const comparison=new Set();
 async function discoveries(view) {
-  const totalPages=Math.max(1,Math.ceil(state.stats.events/100));
+  const catalog=showcaseIndex.filter(e=>e.kind==="Anomaly candidate")
+    .sort((a,b)=>b.recorded_at.localeCompare(a.recorded_at));
+  const totalPages=Math.max(1,Math.ceil(catalog.length/100));
   const current=Math.min(totalPages,Math.max(1,parseInt(route().id||"1",10)||1));
-  let all=events();
-  if(current>1){
-    const wait=el("p","muted","Loading catalog page…");view.append(wait);
-    try{
-      const reply=await fetch("/data/catalog/"+current+".json",{cache:"no-store"});
-      if(!reply.ok)throw Error();
-      all=await reply.json();if(!Array.isArray(all))throw Error();
-    }catch{wait.textContent="This catalog page could not be loaded.";view.append(link("Return to first page","#discoveries"));return;}
-    if(!view.isConnected)return;
-    wait.remove();
-  }
+  const all=(await Promise.all(catalog.slice((current-1)*100,current*100).map(e=>findEvent(e.id)))).filter(Boolean);
+  if(!view.isConnected)return;
   const controls=el("div","catalog-tools"), result=el("div");
   const term=el("label","","Classification "), select=el("select");
   for(const opt of ["",...new Set(all.map(nameOf))]) {const o=el("option","",opt||"All classifications");o.value=opt;select.append(o);}
@@ -260,6 +255,7 @@ async function discoveries(view) {
   }
 }
 async function findEvent(id) {
+  if(!reviewedCatalog.has(id))return null;
   let e=events().find(x=>String(x.id)===id);
   if (!e && /^[A-Za-z0-9_-]{1,160}$/.test(id)) {
     try {const r=await fetch("/data/events/"+encodeURIComponent(id)+".json");if(r.ok){const found=await r.json();if(String(found.id)===id)e=found;}} catch {}
@@ -269,7 +265,7 @@ async function findEvent(id) {
 async function detail(id,view) {
   const e=await findEvent(id);
   if (route().id!==id || !view.isConnected) return;
-  if (!e) {view.append(el("p","empty","This recording could not be found."),link("Browse discoveries","#discoveries"));return;}
+  if (!e) {view.append(el("p","empty","This recording has no published Pip review or is unavailable."),link("Browse discoveries","#discoveries"));return;}
   const box=el("article","panel pad detail");
   box.append(el("p","label",nameOf(e)),el("h2","",eventTitle(e)),
     el("p","sourceid",e.id),player(e),el("p","figure-note",e.station?"Playback copy of the processed archive excerpt. Original level uses the analysis signal before listening adjustments.":"Playback copy of the archived interval. Original level uses the source amplitude before listening adjustments."));
@@ -336,7 +332,7 @@ function methodology(view) {prose(view,[
 let researchData=null;
 let researchError=false;
 let researchRequest=null;
-const playableEntries=items=>Array.isArray(items)?items.filter(e=>e?.id&&media(e.audio_url)):[];
+
 function researchHeading(parent,title,count) {
   const head=el("div","section-head");
   head.append(el("h2","",title));
@@ -420,6 +416,7 @@ function researchQuality(view,q) {
     ["Source excerpts with full-scale samples",num(q.rail_samples,0)+" / "+num(q.source_quality_n,0)],
     ["All-zero source excerpts",num(q.zero_source_samples,0)+" / "+num(q.source_quality_n,0)],
     ...(Number.isInteger(q.ai_monthly_usd)?[["Pip’s budget · "+q.ai_budget_month+" UTC","$"+num(q.ai_committed_micro/1000000,3)+" of $"+num(q.ai_monthly_usd,0)+" used or reserved"]]:[["AI attempts / lifetime allowance",num(q.ai_attempts,0)+" / "+num(q.ai_limit,0)]]),
+    ...(Number.isInteger(q.startup_total)?[["Startup anomalies reviewed",q.startup_complete+" / "+q.startup_total]]:[]),
     ["AI reviews completed",num(q.ai_completed,0)]
   ];
   for(const [label,value] of metrics){
@@ -427,7 +424,7 @@ function researchQuality(view,q) {
   }
   view.append(grid,el("p","figure-note","Processing timestamps · "+when(q.first_processed_at)+" to "+when(q.latest_processed_at)));
 }
-let showcaseIndex=null;
+let showcaseIndex=[],reviewedCatalog=new Map();
 const browse={genre:"",mood:"",kind:"",page:0};
 async function catalogEntry(id){
   try{
@@ -483,14 +480,12 @@ function research(view) {
   hero.append(portrait,bio);view.append(hero);
   if(researchError)view.append(el("p","empty",researchData?"Could not refresh the research snapshot. Showing the last loaded notes.":"The research snapshot could not be loaded."));
   if(researchData){
-    const notes=(Array.isArray(researchData.notes)?researchData.notes:[]).filter(n=>n?.event?.id&&media(n.event.audio_url)).sort((a,b)=>b.priority-a.priority);
-    if(notes.length){
+    const featured=researchData.notes.find(n=>n.event?.id===researchData.featured_id&&reviewedCatalog.has(n.event.id));
+    if(featured){
       researchHeading(view,"Pip’s featured recording");
-      view.append(reviewNote(notes[0]));
+      view.append(reviewNote(featured));
     }
-    const fallback=[...new Map([...notes.map(n=>n.event),...events(),...playableEntries(researchData.source_clips)].map(e=>[e.id,e])).values()]
-      .filter(e=>media(e.audio_url)).map(e=>({id:e.id,kind:e.station?"Archive sample":"Anomaly candidate"}));
-    browseShowcase(view,showcaseIndex??fallback);
+    browseShowcase(view,showcaseIndex);
     const coverage=el("section");
     coverage.id="research-coverage";
     collectionInventory(coverage,researchData.inventory);
@@ -518,10 +513,6 @@ async function refreshResearch() {
     const data=await reply.json();
     if(!Array.isArray(data.notes)||!Array.isArray(data.queue)||!Array.isArray(data.sources)||!Array.isArray(data.source_clips))throw Error();
     changed=!researchData || researchError || data.generated_at!==researchData.generated_at;
-    try{
-      const idx=await fetch("/data/showcase.json",{cache:"no-store",signal:AbortSignal.timeout(10000)});
-      if(idx.ok){const entries=await idx.json();if(Array.isArray(entries)){changed=changed||!showcaseIndex;showcaseIndex=entries;}}
-    }catch{}
     researchData=data;researchError=false;
   }catch{changed=!researchError;researchError=true;}
   finally{researchRequest=null;}
@@ -549,14 +540,19 @@ function render(){
   byId("notice").textContent=page==="research"?"":warning||(!state&&["discoveries","observatory"].includes(page)?"Loading observatory data…":"");
   const view=el("div");byId("view").replaceChildren(view);
   if(page==="research")research(view);
-  else if(page==="discovery")detail(id,view);
+  else if(page==="discovery"&&state)detail(id,view);
   else if(page==="compare"&&state)compare(id,view);
   else if(state)({observatory,discoveries})[page](view);
 }
 async function refresh(){
   try{const res=await fetch("/data/observatory.json",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!res.ok)throw Error();const next=await res.json();
     if(!next||typeof next.stats!=="object"||!Array.isArray(next.events))throw Error();
-    const changed=revision!==next.generated_at||!state||warning;revision=next.generated_at;state=next;warning=Date.now()-Date.parse(next.generated_at)>900000?"Worker snapshot is over 15 minutes old. Showing the last published observation.":"";
+    const indexResponse=await fetch("/data/showcase.json",{cache:"no-store",signal:AbortSignal.timeout(15000)});
+    if(!indexResponse.ok)throw Error();
+    const nextIndex=(await indexResponse.json()).filter(e=>e.reviewed===true);
+    const indexChanged=JSON.stringify(nextIndex)!==JSON.stringify(showcaseIndex);
+    showcaseIndex=nextIndex;reviewedCatalog=new Map(nextIndex.map(e=>[e.id,e]));
+    const changed=indexChanged||revision!==next.generated_at||!state||warning;revision=next.generated_at;state=next;warning=Date.now()-Date.parse(next.generated_at)>900000?"Worker snapshot is over 15 minutes old. Showing the last published observation.":"";
     if(changed){if([...document.querySelectorAll("audio")].some(a=>!a.paused)){pendingRefresh=true;byId("notice").textContent="New observations will appear after playback finishes.";}else render();}
   }catch{warning=state?"Refresh unavailable. Showing the last loaded observations.":"The observation snapshot is unavailable. Research remains accessible.";if(route().page!=="research")byId("notice").textContent=warning;}
 }

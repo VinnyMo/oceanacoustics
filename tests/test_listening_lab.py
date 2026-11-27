@@ -76,3 +76,36 @@ class Lab(unittest.TestCase):
         entry=catalog_note(dict(frequency_hz=310,score_db=12),None)
         self.assertEqual((entry['genre'],entry['mood'],entry['basis']),('Unidentified',None,'Measured description'))
         self.assertIn('310.0 Hz',entry['explanation'])
+
+    def test_startup_sweep_resumes_and_preserves_billing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'db').mkdir()
+            con=database(root)
+            self.addCleanup(con.close)
+            analyst.schema(con)
+            events=[dict(id=str(i),score_db=i,location='test',audio_url='/clip') for i in range(7)]
+            for e in events:
+                con.execute("INSERT INTO windows(event) VALUES(?)",(json.dumps(e),))
+            cohort=analyst.startup(con)
+            self.assertEqual(len(cohort),7)
+            con.execute("INSERT INTO windows(event) VALUES(?)",(json.dumps(dict(id='future')),))
+            self.assertEqual(analyst.startup(con),cohort)
+            from datetime import datetime,timezone
+            now=datetime.now(timezone.utc).isoformat()
+            con.execute("INSERT INTO ai_notes(id,station,requested,version,state,note) VALUES('6','test',?,'old','complete',?)",
+                        (now,json.dumps(dict(check='check'))))
+            key=root/'key';key.write_text('placeholder')
+            result=(dict(check='check'),{},'receipt','model')
+            quality=dict(ai_limit=99)
+            with patch.dict('os.environ',OCEAN_AI_MONTHLY_USD='25'),patch.object(analyst,'KEY_PATH',key),patch.object(analyst,'prepare_audio',return_value=(b'pcm',0)),patch.object(analyst,'request_note',return_value=result) as call:
+                analyst.review_cycle(con,root,events,quality)
+                self.assertEqual(quality['startup_complete'],4)
+                analyst.review_cycle(con,root,events,quality)
+                self.assertEqual(quality['startup_complete'],7)
+                analyst.review_cycle(con,root,events,quality)
+                self.assertEqual(call.call_count,7)
+            self.assertEqual(analyst.attempt_count(con),8)
+            self.assertEqual(analyst.monthly_budget(con,now),{})
+            with patch.dict('os.environ',OCEAN_AI_MONTHLY_USD='25'):
+                self.assertEqual(analyst.monthly_budget(con,now)['ai_committed_micro'],8*analyst.RESERVE_MICRO)

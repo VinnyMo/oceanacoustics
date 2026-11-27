@@ -42,9 +42,10 @@ def listening_picks(candidates):
     """Favor distinct stations among equally ranked reviews; break remaining ties by review date."""
     picks=[]
     locations=set()
-    remaining=list(candidates)
+    remaining=[c for c in candidates if c['animal'] or (c['character']=='distinct patterned sound'
+               and c['genre'] not in ('Machinery','Recording artifact') and c['score']>=4)]
     while remaining and len(picks)<5:
-        winner=max(remaining,key=lambda c:(c['score'],c['event']['location'] not in locations,
+        winner=max(remaining,key=lambda c:(c['animal'],c['score'],c['event']['location'] not in locations,
                                            c['created_at'],c['event']['id']))
         picks.append(winner)
         locations.add(winner['event']['location'])
@@ -63,20 +64,26 @@ def publish_catalog(con, public, events):
     for e in events:
         if not e.get('audio_url') or not e.get('public_audio',True):
             continue
-        item=catalog_note(e,notes.get(e['id']))
-        if note:=item['note']:
+        if e['id'] not in notes:
+            continue
+        item=catalog_note(e,notes[e['id']])
+        note=item['note']
+        if 'character' in note and 'listening_interest' in note:
             fields=('id','location','recorded_at','audio_url','boosted_url','boost_gain_db','lowband_url',
                     'spectrogram_url','source_url','attribution','metadata_url','license','license_url')
             candidates.append(dict(title=item['title'],observation=item['explanation'],
-                                   score=note.get('listening_interest',note['priority']),
-                                   basis='Listening interest' if 'listening_interest' in note else 'Review priority',
+                                   score=note['listening_interest'],genre=item['genre'],character=note['character'],
+                                   animal=(note['character']=='animal-like call' and item['genre'] in ('Dolphins','Whales','Other marine life') and note['listening_interest']>=3),
+                                   basis='Listening interest',
                                    created_at=note['created_at'],event={k:e.get(k) for k in fields}))
         item['environment']=e.get('environment')
         json_write(folder/(e['id']+'.json'),item)
-        entries.append(dict(id=e['id'],genre=item['genre'],mood=item['mood'],kind=item['kind'],
+        entries.append(dict(id=e['id'],title=item['title'],genre=item['genre'],mood=item['mood'],kind=item['kind'],
                             reviewed=item['note'] is not None,priority=(item['note'] or {}).get('priority',0),
                             recorded_at=e['recorded_at']))
     entries.sort(key=lambda i:(i['reviewed'],i['priority'],i['recorded_at'],i['id']),reverse=True)
-    json_write(public/'picks.json',listening_picks(candidates))
+    picks=listening_picks(candidates)
+    json_write(public/'picks.json',picks)
+    json_write(public/'animal-first-picks.json',picks)
     json_write(public/'showcase.json',entries)
     return len(entries)
