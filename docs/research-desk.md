@@ -33,3 +33,9 @@ Initial allowance is **three requests total**, with at most one attempt per work
 The built-in image generator produced the researcher illustration. Generation prompt:
 
 > A small sea otter acoustic scientist in a slightly oversized white lab coat, wearing studio headphones and listening intently with a pencil and pocket notebook. Waist-up, clear friendly silhouette, vintage marine field-guide ink illustration with subtle watercolor, warm ochre fur, teal accents, transparent background, no text.
+
+### Monthly listening budget and catalog
+
+Set `OCEAN_AI_MONTHLY_USD=25` in the service environment to replace the lifetime trial with a $25 calendar-month allowance (UTC). Zero pauses paid listening. The worker lock serializes reservations. Each six-second audio-in, text-out review reserves $0.05 before transmission. Completed requests use reported token counts at standard gpt-audio-1.5 rates ($2.50/M text input, $32/M audio input and $10/M text output). Failed, interrupted and unmetered requests retain their reservation for that month. Review these rates before changing models or request sizes. This ledger covers Pip’s requests only. The OpenAI billing dashboard is authoritative for account charges.
+
+Every playable clip has a permanent recording page and a catalog description. Pip’s listening notes add an observation, possible source, alternative explanation and listening check. Pending clips use measured features. Possible-source filters represent hypotheses. Listening impressions such as Spooky describe how a clip sounds. The catalog publishes only categories with recordings.

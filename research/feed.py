@@ -13,7 +13,7 @@ from scipy.signal import welch
 
 from processing import dsp
 from processing.listening import add_listening
-from research import analyst,noaa_sources,orcasound,polar
+from research import analyst,curator,noaa_sources,orcasound,polar
 
 
 def stations():
@@ -107,7 +107,7 @@ def update(con,root,acquire=True,enable_ai=True):
     times=con.execute("""SELECT min(json_extract(payload,'$.processed_at')),max(json_extract(payload,'$.processed_at')),
                         count(*) FROM windows""").fetchone()
     archive=[json.loads(r[0]) for r in con.execute('SELECT event FROM source_samples ORDER BY rowid DESC LIMIT 200')]
-    events=snapshot['events']+archive
+    events=[json.loads(r[0]) for r in con.execute('SELECT event FROM windows WHERE event IS NOT NULL UNION ALL SELECT event FROM source_samples')]
     quality=dict(distinct_seconds=st['coverage_seconds'],processed_hours=st['hours_analyzed'],
                  recurring_groups=st['recurring_groups'],candidates=st['events'],reviewed=st['reviewed'],
                  silent_windows=st['silent_windows'],windows=times[2],first_processed_at=times[0],
@@ -127,6 +127,10 @@ def update(con,root,acquire=True,enable_ai=True):
     for r in con.execute("""SELECT id,model,requested,note FROM ai_notes WHERE state='complete'
                              ORDER BY json_extract(note,'$.priority') DESC,requested DESC LIMIT 50"""):
         event=json.loads((public/'events'/(r[0]+'.json')).read_text())
-        notes.append(dict(json.loads(r[3]),event=event,model=r[1],created_at=r[2]))
+        note=json.loads(r[3])
+        notes.append(dict(note,event=event,model=r[1],created_at=r[2],
+                          title=curator.catalog_note(event,note)['title']))
+    quality.update(analyst.monthly_budget(con,now()))
+    quality['cataloged']=curator.publish_catalog(con,public,events)
     json_write(public/'research.json',dict(generated_at=now(),status=status,quality=quality,
                notes=notes,queue=analyst.ranked(events,con)[:12],sources=[mbari,*sites],source_clips=archive))

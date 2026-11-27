@@ -255,6 +255,14 @@ async function detail(id,view) {
   links.append(link("Permanent link",detailLink(e)));
   box.append(links,credit(e));
   view.append(box);
+  const c=await catalogEntry(id);
+  if(!view.isConnected)return;
+  if(c){
+    const annotation=el("section","curator-note");
+    annotation.append(el("p","label","Pip · "+c.basis),el("h3","",c.title),el("p","",c.explanation));
+    if(c.note)annotation.append(facts([["Possible source",c.genre],["Working hypothesis",c.note.hypothesis],["Alternative",c.note.alternative],["Listening check",c.note.check]],"annotations"));
+    box.children[2].after(annotation);
+  }
   const related=e.group_id!=null?events().filter(other=>other.id!==e.id&&other.group_id===e.group_id):[];
   if (related.length) {const head=el("div","section-head");const a=link("Browse group →","#discoveries");a.onclick=()=>{group=String(e.group_id);filter=""};head.append(el("h2","","Compare recordings in this group"),a);view.append(head);cards(related.slice(0,6),view);}
 }
@@ -300,7 +308,7 @@ function researchHeading(parent,title,count) {
 function reviewNote(note) {
   const e=note.event, box=el("article","panel pad review-note");
   const clip=el("div","review-clip"), heading=el("h3");
-  heading.append(link(eventTitle(e),detailLink(e)));
+  heading.append(link(note.title||eventTitle(e),detailLink(e)));
   clip.append(el("p","label","Priority "+num(note.priority,0)+" / 5"),heading,
     el("p","small muted",[e.location,when(e.recorded_at)].filter(Boolean).join(" · ")),
     spectrogram(e,"Relative spectral intensity"),player(e),link("Recording details →",detailLink(e)),credit(e));
@@ -313,23 +321,6 @@ function reviewNote(note) {
   box.append(clip,notes);return box;
 }
 const expandedProviders=new Set();
-const visibleClips=new Map();
-function progressivelyShow(view,entries,key,renderItem,gridClass) {
-  let count=Math.min(entries.length,visibleClips.get(key)||3);
-  const list=el("div",gridClass);
-  for (const entry of entries.slice(0,count))list.append(renderItem(entry));
-  view.append(list);
-  if(count===entries.length)return;
-  const more=el("button","more-recordings");
-  const updateLabel=()=>{more.textContent="Show "+Math.min(6,entries.length-count)+" more ("+(entries.length-count)+" remaining)";};
-  updateLabel();view.append(more);
-  more.onclick=()=>{
-    const next=Math.min(count+6,entries.length);
-    for(const entry of entries.slice(count,next))list.append(renderItem(entry));
-    count=next;visibleClips.set(key,count);
-    if(count===entries.length)more.remove();else updateLabel();
-  };
-}
 function sourceRecordings(view,data) {
   researchHeading(view,"Recording sources");
   const sources=Array.isArray(data.sources)?data.sources:[];
@@ -355,11 +346,7 @@ function sourceRecordings(view,data) {
       view.append(details);
     }
   }else view.append(el("p","empty","Source inventory pending."));
-  const clips=playableEntries(data.source_clips);
-  if(clips.length){
-    researchHeading(view,"Source clips",clips.length);
-    progressivelyShow(view,clips,"sources",e=>card(e,{showCredit:true}),"catalog");
-  }
+
 }
 function researchQuality(view,q) {
   if(!q)return;
@@ -377,7 +364,7 @@ function researchQuality(view,q) {
     ["Source screening audio",elapsed(q.source_seconds)],
     ["Source excerpts with full-scale samples",num(q.rail_samples,0)+" / "+num(q.source_quality_n,0)],
     ["All-zero source excerpts",num(q.zero_source_samples,0)+" / "+num(q.source_quality_n,0)],
-    ["AI attempts / lifetime allowance",num(q.ai_attempts,0)+" / "+num(q.ai_limit,0)],
+    ...(Number.isInteger(q.ai_monthly_usd)?[["Pip’s budget · "+q.ai_budget_month+" UTC","$"+num(q.ai_committed_micro/1000000,3)+" of $"+num(q.ai_monthly_usd,0)+" used or reserved"]]:[["AI attempts / lifetime allowance",num(q.ai_attempts,0)+" / "+num(q.ai_limit,0)]]),
     ["AI reviews completed",num(q.ai_completed,0)]
   ];
   for(const [label,value] of metrics){
@@ -385,32 +372,80 @@ function researchQuality(view,q) {
   }
   view.append(grid,el("p","figure-note","Processing timestamps · "+when(q.first_processed_at)+" to "+when(q.latest_processed_at)));
 }
+let showcaseIndex=null;
+const browse={genre:"",mood:"",kind:"",page:0};
+async function catalogEntry(id){
+  try{
+    const res=await fetch("/data/curation/"+encodeURIComponent(id)+".json");
+    if(res.ok)return await res.json();
+  }catch{}
+  return null;
+}
+function browseShowcase(view,entries){
+  const section=el("section","showcase"), tools=el("div","showcase-tools");
+  researchHeading(section,"Explore the sound catalog",entries.length);
+  const results=el("div","catalog"), count=el("p","small muted"), pager=el("div","links");
+  count.setAttribute("role","status");
+  for(const [key,label] of [["genre","Possible source"],["mood","Listening impression"],["kind","Recording type"]]){
+    const field=el("label","",label),select=el("select"), totals=new Map();
+    for(const e of entries)if(e[key])totals.set(e[key],1+(totals.get(e[key])||0));
+    select.setAttribute("aria-label",label);
+    select.add(new Option("All",""));
+    for(const [v,n] of [...totals].sort(([a],[b])=>a.localeCompare(b)))select.add(new Option(v+" ("+n+")",v));
+    if(!totals.has(browse[key]))browse[key]="";
+    select.value=browse[key];select.onchange=()=>{browse[key]=select.value;browse.page=0;draw();};
+    field.append(select);tools.append(field);
+  }
+  function draw(){
+    const hits=entries.filter(e=>["genre","mood","kind"].every(k=>!browse[k]||e[k]===browse[k]));
+    browse.page=Math.min(browse.page,Math.max(0,Math.ceil(hits.length/6)-1));
+    const start=browse.page*6;
+    count.textContent=hits.length?"Showing "+(start+1)+"–"+Math.min(start+6,hits.length)+" of "+hits.length+" recordings":"No recordings match these filters.";
+    results.replaceChildren();pager.replaceChildren();
+    for(const entry of hits.slice(start,start+6)){
+      const slot=el("div","showcase-slot","Loading recording…");results.append(slot);
+      Promise.all([findEvent(entry.id),catalogEntry(entry.id)]).then(([e,c])=>{
+        if(!e){slot.replaceChildren(link("Open recording",detailLink(entry)));return;}
+        const item=card({...e,title:c?.title||eventTitle(e)},{showCredit:true});
+        item.firstChild.textContent=[c?.basis||entry.kind,c?.genre,c?.mood].filter(Boolean).join(" · ");
+        if(c?.explanation)item.children[1].after(el("p","",c.explanation));
+        slot.replaceChildren(item);
+      });
+    }
+    for(const [label,delta] of [["Previous",-1],["Next",1]]){
+      if(browse.page+delta<0||(browse.page+delta)*6>=hits.length)continue;
+      const button=el("button","",label);button.onclick=()=>{browse.page+=delta;draw();section.scrollIntoView();};pager.append(button);
+    }
+  }
+  section.append(tools,count,results,pager);view.append(section);draw();
+}
 function research(view) {
   const hero=el("section","panel pip"), portrait=el("img","portrait"), bio=el("div","pip-bio");
   portrait.src="/researcher.webp";portrait.alt="Pip, an otter wearing a laboratory coat";portrait.width=200;portrait.height=200;
-  bio.append(el("p","label","Observatory researcher"),el("h2","","Pip’s review desk"),
-    el("p","","Pip organizes recordings for a second listen. Each AI field note pairs a working hypothesis with an alternative explanation and a check for a human reviewer."));
+  bio.append(el("p","label","Observatory researcher"),el("h2","","Pip’s listening room"),
+    el("p","","Follow Pip’s picks, listen for the features he describes, and explore possible sources. Each listening note gives you an alternative explanation to test."));
   if(researchData?.status)bio.append(el("p","figure-note",researchData.status));
   hero.append(portrait,bio);view.append(hero);
   if(researchError)view.append(el("p","empty",researchData?"Could not refresh the research snapshot. Showing the last loaded notes.":"The research snapshot could not be loaded."));
   if(researchData){
     const notes=(Array.isArray(researchData.notes)?researchData.notes:[]).filter(n=>n?.event?.id&&media(n.event.audio_url)).sort((a,b)=>b.priority-a.priority);
-    researchHeading(view,"Ranked listening notes",notes.length);
-    if(notes.length)progressivelyShow(view,notes,"notes",reviewNote,"review-stack");
-    else view.append(el("p","empty","No AI field notes have been published yet."));
+    if(notes.length){
+      researchHeading(view,"Pip’s featured recording");
+      view.append(reviewNote(notes[0]));
+    }
+    const fallback=[...new Map([...notes.map(n=>n.event),...events(),...playableEntries(researchData.source_clips)].map(e=>[e.id,e])).values()]
+      .filter(e=>media(e.audio_url)).map(e=>({id:e.id,kind:e.station?"Archive sample":"Anomaly candidate"}));
+    browseShowcase(view,showcaseIndex??fallback);
     const coverage=el("section");
     coverage.id="research-coverage";
     researchQuality(coverage,researchData.quality);
-    processingLedger(coverage);
+    const ledger=el("details","methods");ledger.append(el("summary","","Processing statistics and recording sources"));
+    processingLedger(ledger);sourceRecordings(ledger,researchData);coverage.append(ledger);
     view.append(coverage);
     if(coverageJump && location.hash==="#research/coverage"){
       coverageJump=false;
       requestAnimationFrame(()=>coverage.scrollIntoView());
     }
-    const queue=playableEntries(researchData.queue);
-    researchHeading(view,"Awaiting review",queue.length);
-    if(queue.length)progressivelyShow(view,queue,"queue",e=>card(e,{showCredit:true}),"catalog");else view.append(el("p","empty","The published review queue is empty."));
-    sourceRecordings(view,researchData);
     view.append(el("p","figure-note","Research snapshot · "+when(researchData.generated_at)));
   }else if(!researchError)view.append(el("p","empty","Loading research notes and recordings…"));
   const methods=el("details","methods"),summary=el("summary","","Research methods and references");methods.append(summary);methodology(methods);view.append(methods);
@@ -427,6 +462,10 @@ async function refreshResearch() {
     const data=await reply.json();
     if(!Array.isArray(data.notes)||!Array.isArray(data.queue)||!Array.isArray(data.sources)||!Array.isArray(data.source_clips))throw Error();
     changed=!researchData || researchError || data.generated_at!==researchData.generated_at;
+    try{
+      const idx=await fetch("/data/showcase.json",{cache:"no-store",signal:AbortSignal.timeout(10000)});
+      if(idx.ok){const entries=await idx.json();if(Array.isArray(entries)){changed=changed||!showcaseIndex;showcaseIndex=entries;}}
+    }catch{}
     researchData=data;researchError=false;
   }catch{changed=!researchError;researchError=true;}
   finally{researchRequest=null;}
