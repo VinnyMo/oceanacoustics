@@ -18,3 +18,9 @@ Reproduce the window selection from the dates and sample offsets in the ledger o
 ## Native 16 kHz follow-up
 
 A November 27 mixed-rate test added two 60-second, 24-bit source windows to a copy of the six-minute pilot ledger. End-to-end wall time was 8.85 s (13.6× real time), with peak RSS 214,892 KiB and 5,760,000 new source PCM bytes. The test used the Ubuntu system libraries, one OpenBLAS thread and nice 15 outside the production CPU quota. The monitoring excerpt contained 96,000 native frames at 16 kHz; its six-second duration and all three earlier 2 kHz excerpts were verified. One minute overlapped a previously processed UTC interval, yielding eight minutes analyzed and seven distinct minutes of coverage.
+
+## Listening and multi-archive pilot
+
+Seven public MBARI clips had native peaks from −67.7 to −48.9 dBFS. Their Opus playback RMS levels ranged from −86.3 to −73.6 dBFS. Several detector peaks were below 80 Hz. Four tested listening derivatives decoded at approximately −21 dBFS RMS. The original waveforms and source-level copies remain available.
+
+The [NOAA station receipts](../docs/noaa-pilot.json) document 40 verified stations. Six Orcasound nodes supplied six-second samples; four used estimated UTC from a session epoch and contiguous segment durations. The AWI pilot verified PALAOA (96 kHz) and AWI231-13 (24 kHz); three other deployments returned HTTP 503 during the initial bounded requests. These observations verify access at the time of testing. Each production cycle records its own acquisition results.

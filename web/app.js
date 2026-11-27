@@ -6,8 +6,7 @@ const pages = {
   observatory: ["Pacific Sound / MBARI", "Observatory", "Explore the deep-ocean soundscape off Monterey Bay, California."],
   discoveries: ["Acoustic evidence", "Discoveries", "Listen to preserved candidates and compare their acoustic signatures."],
   statistics: ["Processing ledger", "Statistics", "Measurements from the most recently published processing snapshot."],
-  research: ["Field notes", "Research", "Questions, methods and evidence from the open observatory."],
-  contribute: ["Open science", "Contribute", "Reproduce an observation or help develop the analysis."]
+  research: ["Acoustic field notes", "Research", "Listen to the evidence behind each open question."]
 };
 const num = (x, digits=1) => typeof x === "number" && Number.isFinite(x)
   ? x.toLocaleString("en-US", {maximumFractionDigits: digits}) : "Unknown";
@@ -58,18 +57,63 @@ function spectrogram(e,caption) {
   const img=plot.querySelector("img");
   if (!img) return plot;
   const axis=el("div","plot-area"), freq=el("div","freq-axis");
-  for (const tick of (e.sample_rate_hz===16000?["8 kHz","4 kHz","0 Hz"]:["1 kHz","500 Hz","0 Hz"])) freq.append(el("span","",tick));
+  const nyquist = Number.isFinite(e.sample_rate_hz) ? e.sample_rate_hz/2 : isMbari(e) ? 1000 : null;
+  if (nyquist) for (const hz of [nyquist,nyquist/2,0]) {
+    freq.append(el("span","",hz>=1000?num(hz/1000,2)+" kHz":num(hz)+" Hz"));
+  }
   const time=el("div","time-axis");
   for(const ratio of [0,.25,.5,.75,1]) time.append(el("span","",num(e.duration_seconds*ratio)+" s"));
   plot.prepend(axis);axis.append(freq,img,time);return plot;
 }
 function player(e) {
-  const url=media(e.audio_url);
-  if (!url) return el("p","muted","Playback unavailable.");
-  const audio=el("audio");
-  audio.controls=true; audio.preload="none"; audio.src=url;
-  audio.setAttribute("aria-label","Original-speed recording "+e.id);
-  return audio;
+  const original=media(e.audio_url), boosted=media(e.boosted_url), lowband=media(e.lowband_url);
+  if (!original) return el("p","muted","Playback unavailable.");
+  const wrap=el("div","clip-player"), audio=el("audio");
+  audio.controls=true;audio.preload="none";
+  audio.setAttribute("aria-label","Recording "+e.id);
+  const choice=el("select"), label=el("label","playback-level","Playback level ");
+  const levelOriginal=el("option","","Original level");levelOriginal.value=original;choice.append(levelOriginal);
+  const help=el("p","figure-note");
+  if(boosted){
+    const gain=Number.isFinite(e.boost_gain_db)?" (+"+num(e.boost_gain_db,1)+" dB)":"";
+    const levelBoost=el("option","","Boosted listening"+gain);levelBoost.value=boosted;choice.append(levelBoost);
+    choice.value=boosted;help.textContent="Boost raises background noise too.";
+  }
+  if(lowband){
+    const shifted=el("option","","Low band +220 Hz");shifted.value=lowband;choice.append(shifted);
+  }
+  choice.disabled=choice.options.length<2;
+  function describeLevel(){
+    help.textContent=lowband && choice.value===lowband
+      ? "Frequency-transformed preview. The low band is shifted up by 220 Hz for small speakers."
+      : boosted && choice.value===boosted ? "Boost raises background noise too." : "Original recording level.";
+  }
+  describeLevel();
+  audio.src=choice.value;label.append(choice);wrap.append(audio,label,help);
+  let pending=null;
+  choice.onchange=()=>{
+    describeLevel();
+    const position=pending?.position??audio.currentTime;
+    const playing=pending?.playing??!audio.paused;
+    pending={position,playing};
+    audio.src=choice.value;audio.load();
+  };
+  audio.addEventListener("loadedmetadata",()=>{
+    if(!pending||audio.currentSrc!==choice.value)return;
+    const {position,playing}=pending;pending=null;
+    if(position>0)audio.currentTime=Number.isFinite(audio.duration)?Math.min(position,audio.duration):position;
+    if(playing)audio.play().catch(()=>{});
+  });
+  audio.addEventListener("error",()=>{
+    if(choice.value!==original){
+      choice.selectedOptions[0].disabled=true;
+      pending=pending||{position:audio.currentTime||0,playing:false};
+      choice.value=original;levelOriginal.selected=true;
+      choice.disabled=[...choice.options].filter(o=>!o.disabled).length===1;help.textContent="Selected preview unavailable. Original level selected.";
+      audio.src=original;audio.load();
+    }
+  });
+  return wrap;
 }
 function facts(items,cls="facts") {
   const dl=el("dl",cls);
@@ -80,15 +124,38 @@ function facts(items,cls="facts") {
 }
 const events=()=>Array.isArray(state?.events) ? state.events : [];
 const nameOf=e=>String(e.classification || "Unreviewed candidate").replaceAll("_"," ");
+function httpsUrl(value) {
+  try {const url = new URL(value);return url.protocol === "https:" ? url.href : null;}
+  catch {return null;}
+}
+function isMbari(e) {
+  const url=httpsUrl(e.source_url);
+  return !!url && /^pacific-sound-[a-z0-9-]+\.s3(?:[.-][a-z0-9-]+)*\.amazonaws\.com$/.test(new URL(url).hostname);
+}
+function eventTitle(e) {
+  if(e.title)return e.title;
+  if(e.classification==="Archive sample")return (e.location||e.provider||"Archive")+" excerpt";
+  if(typeof e.frequency_hz==="number")return num(e.frequency_hz)+" Hz candidate";
+  return e.location ? "Recording from "+e.location : "Acoustic recording";
+}
+function credit(e) {
+  const text=el("p","small muted");
+  if(e.attribution)text.append(httpsUrl(e.metadata_url)?link(e.attribution,httpsUrl(e.metadata_url)):e.attribution);
+  else if(isMbari(e))text.append("Recording by Monterey Bay Aquarium Research Institute, ",link("Pacific Sound",sourceRegistry),". Original-speed excerpt and encoded playback copy under ",link("CC BY 4.0","https://creativecommons.org/licenses/by/4.0/"),".");
+  else text.append("Recording attribution unavailable.");
+  if(e.attribution && httpsUrl(e.license_url))text.append(" · ",link(e.license||"Source license",httpsUrl(e.license_url)));
+  return text;
+}
 const detailLink=e=>"#discovery/"+encodeURIComponent(e.id);
 function card(e,options={}) {
   const c=el("article","card"), heading=el("h3");
   c.append(el("p","label",nameOf(e)));
-  heading.append(link(typeof e.frequency_hz==="number"?num(e.frequency_hz)+" Hz candidate":"Acoustic candidate",detailLink(e)));
+  heading.append(link(eventTitle(e),detailLink(e)));
   c.append(heading,el("p","small muted",when(e.recorded_at)));
   c.append(picture(e.spectrogram_url,"Spectrogram of acoustic candidate",""),player(e));
-  c.append(el("p","small muted",elapsed(e.duration_seconds)+" · "+(e.location || "MBARI, Monterey Bay")));
+  c.append(el("p","small muted",elapsed(e.duration_seconds)+" · "+(e.location || "Location unavailable")));
   c.append(link("Inspect recording →",detailLink(e)));
+  if(options.showCredit)c.append(credit(e));
   if(options.onCompare){
     const label=el("label","compare-check"), checkbox=el("input");
     checkbox.type="checkbox";checkbox.checked=comparison.has(String(e.id));
@@ -168,23 +235,26 @@ async function detail(id,view) {
   if (route().id!==id || !view.isConnected) return;
   if (!e) {view.append(el("p","empty","This recording could not be found."),link("Browse discoveries","#discoveries"));return;}
   const box=el("article","panel pad detail");
-  box.append(el("p","label",nameOf(e)),el("h2","",typeof e.frequency_hz==="number"?num(e.frequency_hz)+" Hz candidate":"Acoustic candidate"),
-    el("p","sourceid",e.id),player(e),el("p","figure-note","Original speed · Browser playback copy"));
+  box.append(el("p","label",nameOf(e)),el("h2","",eventTitle(e)),
+    el("p","sourceid",e.id),player(e),el("p","figure-note",e.station?"Playback copy of the processed archive excerpt. Original level uses the analysis signal before listening adjustments.":"Playback copy of the archived interval. Original level uses the source amplitude before listening adjustments."));
   box.append(spectrogram(e,"Relative spectral intensity · Colors scaled within this clip"),picture(e.waveform_url,"Candidate waveform","Amplitude through time"));
-  box.append(facts([["Recorded",when(e.recorded_at)],["Location",e.location||"MBARI, Monterey Bay"],["Clip duration",elapsed(e.duration_seconds)],["Peak frequency",num(e.frequency_hz)+" Hz"],["Source identifier",e.source_id],["Detector",e.algorithm],["Score above background",num(e.score_db,2)+" dB"],["Review status",e.review_status||"Unreviewed"]],"measurements"));
+  box.append(facts([["Recorded",when(e.recorded_at)],["Location",e.location||"Location unavailable"],["Clip duration",elapsed(e.duration_seconds)],["Peak frequency",num(e.frequency_hz)+" Hz"],...(e.native_rate?[["Native sampling rate",num(e.native_rate,0)+" Hz"],["Analysis sampling rate",num(e.sample_rate_hz,0)+" Hz"]]:[]),["Source identifier",e.source_id],
+    ...(e.source_encoding?[["Native encoding",e.source_encoding]]:[]),
+    ...(e.clock_evidence||e.quality?[["Timestamp evidence",e.clock_evidence||e.quality]]:[]),
+    ...(e.algorithm?[["Detector",e.algorithm]]:[]),
+    ...(Number.isFinite(e.score_db)?[["Score above background",num(e.score_db,2)+" dB"]]:[]),["Review status",e.review_status||"Unreviewed"]],"measurements"));
   if(e.reference_comparison?.scores){
     const scores=e.reference_comparison.scores;
     box.append(el("h3","","Coastal reference comparison"),facts([["UF310 correlation",num(scores.UF310,3)],["UF440 correlation",num(scores.UF440,3)]]),
       el("p","small muted","Correlation compares spectral shape with two coastal development excerpts. A score alone cannot identify the sound source."));
   }
   const links=el("p","links");
-  for(const [label,url] of [["Download playback audio",e.audio_url],["Download lossless excerpt",e.lossless_url]]) {
+  for(const [label,url] of [["Download playback audio",e.audio_url],[e.station?"Download analysis PCM (WAV)":"Download lossless excerpt",e.lossless_url]]) {
     if(media(url)){const a=link(label,media(url));a.download="";links.append(a);}
   }
-  if (e.source_url) {try {const u=new URL(e.source_url);if(u.protocol==="https:")links.append(link("Archive recording",u.href));}catch{}}
-  links.append(link("Permanent link",detailLink(e)));const attribution=el("p","small muted");
-  attribution.append("Recording by Monterey Bay Aquarium Research Institute, ",link("Pacific Sound",sourceRegistry),". Original-speed excerpt and encoded playback copy under ",link("CC BY 4.0","https://creativecommons.org/licenses/by/4.0/"),".");
-  box.append(links,attribution);
+  if (httpsUrl(e.source_url))links.append(link("Source archive file",httpsUrl(e.source_url)));
+  links.append(link("Permanent link",detailLink(e)));
+  box.append(links,credit(e));
   view.append(box);
   const related=e.group_id!=null?events().filter(other=>other.id!==e.id&&other.group_id===e.group_id):[];
   if (related.length) {const head=el("div","section-head");const a=link("Browse group →","#discoveries");a.onclick=()=>{group=String(e.group_id);filter=""};head.append(el("h2","","Compare recordings in this group"),a);view.append(head);cards(related.slice(0,6),view);}
@@ -202,17 +272,152 @@ function prose(view,sections) {
   for(const [title,paragraph,links] of sections){const section=el("section","panel pad");section.append(el("h2","",title),el("p","",paragraph));const items=el("div","links");for(const [label,url] of links||[])items.append(link(label,url));section.append(items);body.append(section);}
   view.append(body);
 }
-function research(view) {prose(view,[
+function methodology(view) {prose(view,[
   ["What recurs in the deep ocean?","We measure changes in underwater sound and preserve excerpts for review. Our first question is whether similar narrowband events recur across independent recording dates at the Monterey Accelerated Research System hydrophone.",[["Study protocol",repository+"/blob/main/RESEARCH.md"]]],
   ["From recording to candidate","The baseline measures spectral energy against local background. Each candidate links its analysis to an archive identifier and recording time. Human review is needed to attribute a source. A quiet analyzed interval contributes to coverage even when it yields no candidates.",[["Experiment results","#statistics"],["Inspect candidates","#discoveries"]]],
   ["Coastal fish choruses","UF310 and UF440 are reference targets from California sanctuary studies. Their coastal recordings and Monterey Bay’s deep offshore observations differ in habitat, propagation and instrumentation. Frequency alone cannot identify a chorus.",[["Kim et al., ICES Journal of Marine Science","https://doi.org/10.1093/icesjms/fsag096"],["Dryad annotations","https://doi.org/10.5061/dryad.q2bvq83sw"]]],
   ["Limits of the observations","The 16 kHz source covers frequencies below 8 kHz. Earlier 2 kHz excerpts cover frequencies below 1 kHz. Weather, vessels, instruments and biological sources can produce overlapping signatures. Audited examples and independent held-out recordings are needed to estimate sensitivity and false alarms.",[["MBARI archive",sourceRegistry],["Pacific Sound documentation","https://docs.mbari.org/pacific-sound/"]]]
 ]);}
-function contribute(view){prose(view,[
-  ["Reproduce a recording","Start with a candidate’s permanent link, note its source identifier and UTC timestamp, then follow the repository setup and processing instructions.",[["Start here",repository+"/blob/main/START_HERE.md"],["Source code",repository]]],
-  ["Contribute analysis","Propose a reproducible experiment, document review criteria or improve the detector. Include the algorithm version, source identifiers and measured results with your contribution.",[["Contribution guidelines",repository+"/blob/main/CONTRIBUTING.md"],["Research protocol",repository+"/blob/main/RESEARCH.md"]]],
-  ["Future collaboration","Distributed processing and AI-assisted review are roadmap items. The public observatory currently publishes read-only results.",[["Roadmap",repository+"/blob/main/ROADMAP.md"]]]
-]);}
+let researchData=null;
+let researchError=false;
+let researchRequest=null;
+const playableEntries=items=>Array.isArray(items)?items.filter(e=>e?.id&&media(e.audio_url)):[];
+function researchHeading(parent,title,count) {
+  const head=el("div","section-head");
+  head.append(el("h2","",title));
+  if(count!=null)head.append(el("span","small muted",count+" "+(count===1?"recording":"recordings")));
+  parent.append(head);
+}
+function reviewNote(note) {
+  const e=note.event, box=el("article","panel pad review-note");
+  const clip=el("div","review-clip"), heading=el("h3");
+  heading.append(link(eventTitle(e),detailLink(e)));
+  clip.append(el("p","label","Priority "+num(note.priority,0)+" / 5"),heading,
+    el("p","small muted",[e.location,when(e.recorded_at)].filter(Boolean).join(" · ")),
+    spectrogram(e,"Relative spectral intensity"),player(e),link("Recording details →",detailLink(e)),credit(e));
+  const notes=el("div","review-text");
+  notes.append(el("p","label","AI-assisted review"),facts([
+    ["Observation",note.observation],["Working hypothesis",note.hypothesis],
+    ["Alternative explanation",note.alternative],["Recommended human check",note.check]
+  ],"annotations"));
+  if(note.model||note.created_at)notes.append(el("p","small muted",[note.model,note.created_at&&when(note.created_at)].filter(Boolean).join(" · ")));
+  box.append(clip,notes);return box;
+}
+const expandedProviders=new Set();
+const visibleClips=new Map();
+function progressivelyShow(view,entries,key,renderItem,gridClass) {
+  let count=Math.min(entries.length,visibleClips.get(key)||3);
+  const list=el("div",gridClass);
+  for (const entry of entries.slice(0,count))list.append(renderItem(entry));
+  view.append(list);
+  if(count===entries.length)return;
+  const more=el("button","more-recordings");
+  const updateLabel=()=>{more.textContent="Show "+Math.min(6,entries.length-count)+" more ("+(entries.length-count)+" remaining)";};
+  updateLabel();view.append(more);
+  more.onclick=()=>{
+    const next=Math.min(count+6,entries.length);
+    for(const entry of entries.slice(count,next))list.append(renderItem(entry));
+    count=next;visibleClips.set(key,count);
+    if(count===entries.length)more.remove();else updateLabel();
+  };
+}
+function sourceRecordings(view,data) {
+  researchHeading(view,"Recording sources");
+  const sources=Array.isArray(data.sources)?data.sources:[];
+  if(sources.length){
+    const grouped=new Map();
+    for(const item of sources){
+      const name=item.provider||"Other sources";
+      if(!grouped.has(name))grouped.set(name,[]);
+      grouped.get(name).push(item);
+    }
+    for(const [name,items] of grouped){
+      const details=el("details","panel provider-list"), summary=el("summary");
+      summary.append(el("strong","",name),el("span","small muted",items.length+" "+(items.length===1?"feed or deployment":"feeds or deployments")));
+      details.append(summary);
+      const list=el("ul","feed-list");
+      for(const item of items){
+        const row=el("li");
+        row.append(el("span","",item.location||item.id),el("span","small muted",[item.status,Number.isInteger(item.clips)?num(item.clips,0)+" clips":null].filter(Boolean).join(" · ")));
+        list.append(row);
+      }
+      details.append(list);details.open=expandedProviders.has(name);
+      details.ontoggle=()=>{if(details.open)expandedProviders.add(name);else expandedProviders.delete(name);};
+      view.append(details);
+    }
+  }else view.append(el("p","empty","Source inventory pending."));
+  const clips=playableEntries(data.source_clips);
+  if(clips.length){
+    researchHeading(view,"Source clips",clips.length);
+    progressivelyShow(view,clips,"sources",e=>card(e,{showCredit:true}),"catalog");
+  }
+}
+function researchQuality(view,q) {
+  if(!q)return;
+  researchHeading(view,"Coverage and data quality");
+  const grid=el("div","stats");
+  const span=(Date.parse(q.latest_processed_at)-Date.parse(q.first_processed_at))/1000;
+  const metrics=[
+    ["Processing timespan",Number.isFinite(span)?elapsed(span):"Unknown"],
+    ["MBARI distinct coverage",elapsed(q.distinct_seconds)],
+    ["Processing effort",num(q.processed_hours,3)+" audio hours"],
+    ["Provisional recurring groups",num(q.recurring_groups,0)],
+    ["Candidates",num(q.candidates,0)],["Reviewed",num(q.reviewed,0)],
+    ["All-zero windows",num(q.silent_windows,0)+" / "+num(q.windows,0)],
+    ["Sampled feeds or deployments",num(q.sites_sampled,0)],["Source excerpts",num(q.source_samples,0)],
+    ["Source screening audio",elapsed(q.source_seconds)],
+    ["Source excerpts with full-scale samples",num(q.rail_samples,0)+" / "+num(q.source_quality_n,0)],
+    ["All-zero source excerpts",num(q.zero_source_samples,0)+" / "+num(q.source_quality_n,0)],
+    ["AI attempts / lifetime allowance",num(q.ai_attempts,0)+" / "+num(q.ai_limit,0)],
+    ["AI reviews completed",num(q.ai_completed,0)]
+  ];
+  for(const [label,value] of metrics){
+    const item=el("div","panel metric");item.append(el("small","",label),el("strong","",value));grid.append(item);
+  }
+  view.append(grid,el("p","figure-note","Processing timestamps · "+when(q.first_processed_at)+" to "+when(q.latest_processed_at)));
+}
+function research(view) {
+  const hero=el("section","panel pip"), portrait=el("img","portrait"), bio=el("div","pip-bio");
+  portrait.src="/researcher.webp";portrait.alt="Pip, an otter wearing a laboratory coat";portrait.width=200;portrait.height=200;
+  bio.append(el("p","label","Observatory researcher"),el("h2","","Pip’s review desk"),
+    el("p","","Pip organizes recordings for a second listen. Each AI field note pairs a working hypothesis with an alternative explanation and a check for a human reviewer."));
+  if(researchData?.status)bio.append(el("p","figure-note",researchData.status));
+  hero.append(portrait,bio);view.append(hero);
+  if(researchError)view.append(el("p","empty",researchData?"Could not refresh the research snapshot. Showing the last loaded notes.":"The research snapshot could not be loaded."));
+  if(researchData){
+    const notes=(Array.isArray(researchData.notes)?researchData.notes:[]).filter(n=>n?.event?.id&&media(n.event.audio_url)).sort((a,b)=>b.priority-a.priority);
+    researchHeading(view,"Ranked listening notes",notes.length);
+    if(notes.length)progressivelyShow(view,notes,"notes",reviewNote,"review-stack");
+    else view.append(el("p","empty","No AI field notes have been published yet."));
+    researchQuality(view,researchData.quality);
+    const queue=playableEntries(researchData.queue);
+    researchHeading(view,"Awaiting review",queue.length);
+    if(queue.length)progressivelyShow(view,queue,"queue",e=>card(e,{showCredit:true}),"catalog");else view.append(el("p","empty","The published review queue is empty."));
+    sourceRecordings(view,researchData);
+    view.append(el("p","figure-note","Research snapshot · "+when(researchData.generated_at)));
+  }else if(!researchError)view.append(el("p","empty","Loading research notes and recordings…"));
+  const methods=el("details","methods"),summary=el("summary","","Research methods and references");methods.append(summary);methodology(methods);view.append(methods);
+  if(!researchData&&!researchError)refreshResearch();
+}
+async function refreshResearch() {
+  if(route().page!=="research" || researchRequest)return;
+  researchRequest=fetch("/data/research.json",{cache:"no-store",signal:AbortSignal.timeout(15000)});
+  let changed;
+  try {
+    const reply=await researchRequest;
+    if(!reply.ok)throw Error();
+    const data=await reply.json();
+    if(!Array.isArray(data.notes)||!Array.isArray(data.queue)||!Array.isArray(data.sources)||!Array.isArray(data.source_clips))throw Error();
+    changed=!researchData || researchError || data.generated_at!==researchData.generated_at;
+    researchData=data;researchError=false;
+  }catch{changed=!researchError;researchError=true;}
+  finally{researchRequest=null;}
+  if(changed && route().page==="research"){
+    if([...document.querySelectorAll("audio")].some(a=>!a.paused))pendingRefresh=true;
+    else render();
+  }
+}
+
 let state=null, warning="", revision="",pendingRefresh=false;
 function route(){const [page,id]=location.hash.slice(1).split("/");if(["discovery","compare","discoveries"].includes(page)){try{return{page,id:decodeURIComponent(id||"")}}catch{return{page,id:""}}}return{page:Object.hasOwn(pages,page)?page:"observatory"};}
 async function compare(ids,view){
@@ -226,9 +431,9 @@ function render(){
   const [k,t,i]=page==="compare"?["Acoustic evidence","Compare recordings","Listen to the selected recordings and inspect their individual spectra."]:page==="discovery"?["Acoustic evidence","Recording detail","Inspect the original-speed excerpt and its provenance."]:pages[active];
   byId("kicker").textContent=k;byId("title").textContent=t;byId("intro").textContent=i;document.title=t+" · Ocean Acoustics";
   for(const a of document.querySelectorAll("nav a")){if(a.hash==="#"+active)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");}
-  byId("notice").textContent=warning||(!state&&["discoveries","statistics","observatory"].includes(page)?"Loading observatory data…":"");
+  byId("notice").textContent=page==="research"?"":warning||(!state&&["discoveries","statistics","observatory"].includes(page)?"Loading observatory data…":"");
   const view=el("div");byId("view").replaceChildren(view);
-  if(page==="research")research(view);else if(page==="contribute")contribute(view);
+  if(page==="research")research(view);
   else if(page==="discovery")detail(id,view);
   else if(page==="compare"&&state)compare(id,view);
   else if(state)({observatory,discoveries,statistics})[page](view);
@@ -237,10 +442,10 @@ async function refresh(){
   try{const res=await fetch("/data/observatory.json",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!res.ok)throw Error();const next=await res.json();
     if(!next||typeof next.stats!=="object"||!Array.isArray(next.events))throw Error();
     const changed=revision!==next.generated_at||!state||warning;revision=next.generated_at;state=next;warning=Date.now()-Date.parse(next.generated_at)>900000?"Worker snapshot is over 15 minutes old. Showing the last published observation.":"";
-    if(changed){if([...document.querySelectorAll("audio")].some(a=>!a.paused)){pendingRefresh=true;byId("notice").textContent="New observations will appear after playback finishes.";}else render();}
-  }catch{warning=state?"Refresh unavailable. Showing the last loaded observations.":"The observation snapshot is unavailable. Research and contribution guides are available.";byId("notice").textContent=warning;}
+    if(changed && route().page!=="research"){if([...document.querySelectorAll("audio")].some(a=>!a.paused)){pendingRefresh=true;byId("notice").textContent="New observations will appear after playback finishes.";}else render();}
+  }catch{warning=state?"Refresh unavailable. Showing the last loaded observations.":"The observation snapshot is unavailable. Research remains accessible.";if(route().page!=="research")byId("notice").textContent=warning;}
 }
 function refreshAfterPlayback(){if(pendingRefresh&&![...document.querySelectorAll("audio")].some(a=>!a.paused)){pendingRefresh=false;render();}}
 document.addEventListener("ended",refreshAfterPlayback,true);
 window.addEventListener("hashchange",()=>{pendingRefresh=false;render();window.scrollTo(0,0);});
-render();refresh();setInterval(refresh,60000);
+render();refresh();setInterval(()=>{refresh();refreshResearch();},60000);

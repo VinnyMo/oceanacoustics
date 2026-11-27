@@ -19,7 +19,7 @@ from classification.families import assign
 from classification.references import compare
 from ingestion import mbari
 from ingestion.provider import Archive
-from processing import dsp
+from processing import dsp,listening
 
 PRIMARY = mbari.PacificSound()
 GB = 10**9
@@ -173,6 +173,7 @@ def work(con, root, mode, archive: Archive = PRIMARY):
                          byte_start=left+sample*width,byte_length=len(clipraw),etag=rec.etag,
                          sha256=hashlib.sha256(clipraw).hexdigest(),algorithm=dsp.VERSION if rate==2000 else "spectral-excess-16k-v1",
                          reference_comparison=compare(resample_poly(x[sample:sample+rate*dsp.CLIP],1,rate//2000)))
+            listening.add_listening(event,folder)
             json_write(public/'events'/f'{ident}.json',event)
         image = public/f'{ident}.png'
         dsp.spectrogram(power,image.with_suffix('.tmp'))
@@ -268,6 +269,14 @@ def main():
                     publish(con,root,'Analyzing '+mode+' window')
                     work(con,root,mode,mbari.PacificSound(args.rate))
                     publish(con,root,'Waiting for next acquisition')
+            guard(root)
+            listening.upgrade(con,root)
+            publish(con,root,'Waiting for next acquisition')
+            try:
+                from research.feed import update
+                update(con,root,acquire=os.environ.get('ENABLE_SOURCE_SAMPLING','1')=='1')
+            except Exception:
+                logging.exception('Research publication failed; primary observations preserved')
         except Exception:
             logging.exception('Worker run failed')
             publish(con,root,'Acquisition paused • retry scheduled')

@@ -1,0 +1,26 @@
+{
+  "source": "https://storage.googleapis.com/noaa-passive-bioacoustic/big_query_metadata/NCEI_NRS_PAD_metadata.xlsx",
+  "sha256": "835b803ccc828a5cc0aa614ab9f8d15b16bb0fefbaa54c100ea7ef18ec8321f6",
+  "columns": [
+    "FILE_NAME",
+    "DEPLOYMENT_NAME",
+    "START_DATE",
+    "START_TIME"
+  ],
+  "first_verified_filename": {
+    "nrs_01_2014-2015": "NRS01_20141014_234015.flac",
+    "nrs_01_2015-2017": "NRS01_20151015_121216.flac",
+    "nrs_02_2015-2016": "NRS02_20150110_000456.flac",
+    "nrs_03_2014-2015": "NRS03_20141001_005028.flac",
+    "nrs_04_2015-2016": "NRS04_20150719_235105.flac",
+    "nrs_05_2014-2015": "NRS05_20141018_010939.flac",
+    "nrs_06_2014-2016": "NRS06_20140801_000315.flac",
+    "nrs_06_2016-2018": "NRS06_20160401_232959.flac",
+    "nrs_08_2014-2015": "NRS08_20140523_001620.flac",
+    "nrs_08_2016-2018": "NRS08_20160414_233332.flac",
+    "nrs_09_2014-2015": "NRS09_20141021_000026.flac",
+    "nrs_09_2016-2017": "NRS09_20161108_171937.flac",
+    "nrs_10_2015-2016": "NRS10_20150615_003510.flac",
+    "nrs_12_2017-2018": "NRS12_20170506_212011.flac"
+  }
+}

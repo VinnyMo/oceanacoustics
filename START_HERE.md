@@ -12,6 +12,8 @@ The default source is MBARI 16 kHz PCM. Launch observations use 2 kHz PCM. This 
 | Browser dashboard and audio comparison | web/ |
 | Owner-run installation, rollback and public health probe | deploy/ |
 
+The Research page publishes a second snapshot at `/data/research.json`. Its sampling and audio review run after primary observations under the same worker lock. The [research desk guide](docs/research-desk.md) covers supported archives, source-specific licenses, audio listening modes, credits and recovery.
+
 ## Work on the project
 
 1. Run the tests in [README.md](README.md). Use a separate state directory when changing an algorithm. Preserve existing results and evidence before migration. The launch schema runs one detector configuration per database.
