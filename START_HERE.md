@@ -1,5 +1,7 @@
 # Start here
 
+The hosted project was retired in November 2026. The [closing notes and archived ledger](README.md#closing-notes--november-2026) describe the final research snapshot. The deployment paths below document the former installation.
+
 The default source is MBARI 16 kHz PCM. Launch observations use 2 kHz PCM. This repository contains software, configuration, numeric reference descriptors and research documentation. Live measurements come from the host database. See the [initial measured baseline](benchmarks/pilot.md) and [operating procedures](docs/operations.md).
 
 | Component | Entry point |

@@ -2,9 +2,17 @@
 
 An open research observatory for public hydrophone recordings. Explore the measured spectrum of offshore Monterey Bay, play original-speed candidate excerpts, and trace each observation back to its archive bytes. The first detector measures transient spectral excess. Source identification requires independent evidence.
 
-[Observatory](https://oceanacoustics.vincentmossman.com) · [Get started](START_HERE.md) · [Research protocol](RESEARCH.md) · [Source audit](docs/sources.md) · [Pilot results](benchmarks/pilot.md)
+[Get started](START_HERE.md) · [Research protocol](RESEARCH.md) · [Source audit](docs/sources.md) · [Pilot results](benchmarks/pilot.md)
 
 A CPU worker discovers MBARI Pacific Sound objects, acquires version-checked native 16 kHz PCM ranges, and writes SQLite WAL records plus static website data. Nginx serves the dashboard, audio and images. Monitoring and historical backfill run independently under one resource-limited timer. The public application accepts no writes.
+
+## Closing notes · November 2026
+
+The hosted observatory has been retired. This repository preserves the software, methods and a compact [research ledger](results/observations.jsonl.gz). Each compressed JSON line describes an analyzed window, candidate, archive excerpt, listening review, review context, or provisional group. Source identifiers, checksums and byte ranges where available let researchers return to the public archives.
+
+At the November 27, 19:05 UTC snapshot, the primary pipeline had processed 361 one-minute MBARI windows, representing 5 hours 54 minutes of distinct recording time. It flagged 288 candidates and grouped some into 14 provisional recurring patterns. Across the project we sampled 49 sites or deployments. Pip completed the initial review of all 35 anomalies in his startup queue. The ledger recorded zero human-reviewed candidates at that snapshot.
+
+The most informative lesson came from listening back. Steady machinery and broadband hiss could earn a high review priority while offering a visitor little to distinguish on replay. We gave listening interest its own score and asked Pip to describe audible structure before suggesting an animal source. The recordings and notes are starting points for comparison. Confirming a biological source would take independent annotations and repeated observations under comparable conditions.
 
 ## Local run
 
