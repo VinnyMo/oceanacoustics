@@ -39,6 +39,17 @@ asowner git -C "$repo" diff --quiet HEAD --
 getent ahosts "$site" >/dev/null
 systemctl is-active --quiet nginx
 nginx -t
+lineage=/etc/letsencrypt/live/$site
+renewal=/etc/letsencrypt/renewal/$site.conf
+issue_cert=no
+if [[ -s $lineage/fullchain.pem && -s $lineage/privkey.pem && -s $renewal ]]; then
+    echo "Using existing TLS certificate; scheduled renewal is handled by certbot.timer."
+elif [[ -e $lineage || -L $lineage || -e $renewal || -L $renewal || -e /etc/letsencrypt/archive/$site ]]; then
+    echo "Incomplete Certbot lineage for $site. Inspect it before deploying." >&2
+    exit 1
+else
+    issue_cert=yes
+fi
 if [[ ! -f $control/managed-v1 ]]; then
     for p in "$control" "$volume" "$ng" "$units/$mountunit" "$units/oceanacoustics.service" "$units/oceanacoustics.timer" /etc/default/oceanacoustics /var/lib/letsencrypt/oceanacoustics /etc/letsencrypt/renewal/oceanacoustics.vincentmossman.com.conf; do
         [[ ! -e $p && ! -L $p ]] || { echo "Existing unmanaged path: $p"; exit 1; }
@@ -198,7 +209,9 @@ server {
 EOF
 # Retain an existing TLS vhost during reinstallation.
 if [[ ! -e $ng ]]; then install -m 644 "$stage/http" "$ng"; nginx -t; systemctl reload nginx; fi
-certbot certonly --webroot -w "$acme" --cert-name "$site" -d "$site" --non-interactive --keep-until-expiring --deploy-hook '/usr/sbin/nginx -t && /usr/bin/systemctl reload nginx'
+if [[ $issue_cert == yes ]]; then
+    certbot certonly --webroot -w "$acme" --cert-name "$site" -d "$site" --non-interactive --keep-until-expiring --deploy-hook '/usr/sbin/nginx -t && /usr/bin/systemctl reload nginx'
+fi
 cp "$stage/http" "$stage/https"
 cat >>"$stage/https" <<EOF
 server {
