@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "Please cite this software and the source archive for each recording."
+title: Ocean Acoustics
+type: software
+authors:
+  - name: Ocean Acoustics contributors
+repository-code: "https://github.com/VinnyMo/oceanacoustics"
+url: "https://oceanacoustics.vincentmossman.com"
+license: GPL-3.0-only
