@@ -10,6 +10,10 @@ Use UTC-aligned, nonoverlapping 60-second windows at 2 kHz. Check the WAV encodi
 
 Store non-detections and zero-filled intervals. Zero samples can indicate padding, dropout or missing effort. A nonzero recording alone cannot establish valid calibrated effort. The coverage exporter reports half-open sample ranges; a null upper bound means the object data length has yet to be inspected. Unlisted archive days and a site's physical uptime need independent effort metadata. Published timestamps distinguish recording, object modification, acquisition and processing. Original publication delay is unknown unless the provider supplies it.
 
+## Native 16 kHz experiment
+
+Use 2,048 samples per transform and a 512-sample hop. This preserves 7.8125 Hz bin spacing and 32 ms frame spacing while extending the analysis to 8 kHz. Store native PCM and the recording rate on every new excerpt. Clustering compares full-band profiles within the same sample rate. The coastal reference comparator receives an anti-aliased 2 kHz copy of the candidate because its descriptor frequency range ends below 1 kHz. Higher-frequency detector performance remains unmeasured on held-out recordings. Hours analyzed counts each processed window. Distinct recording time collapses repeated UTC minutes from the same site across rates and archive versions.
+
 ## Evidence and review
 
 Preserve the native PCM excerpt in a lossless WAV, its PCM checksum, a listening copy encoded as Opus at original speed, a waveform and a relative-level spectrogram. Brightness scales per image. Pressure calibration and cross-instrument loudness comparisons require deployment metadata. Correlation against the two numeric coastal reference profiles measures broad spectral shape. These scores have no validated species interpretation.

@@ -13,6 +13,8 @@ import tempfile
 import time
 from datetime import datetime, timezone, timedelta
 
+from scipy.signal import resample_poly
+
 from classification.families import assign
 from classification.references import compare
 from ingestion import mbari
@@ -56,7 +58,7 @@ def guard(root):
     if used >= 45*GB or shutil.disk_usage(root).free < GB or host_low:
         raise RuntimeError('Downloads suspended for storage headroom')
     for folder, limit in [('cache',20),('db',4),('public/data/events',3),('public/data/catalog',1)]:
-        if usage(root/folder) + 2_000_000 > limit*GB:
+        if usage(root/folder) + 5_000_000 > limit*GB:
             raise RuntimeError(f'{folder} budget reached')
 
 
@@ -103,19 +105,21 @@ def next_month(month):
 
 
 def work(con, root, mode, archive: Archive = PRIMARY):
+    rate = archive.rate
+    cursor_name = "month" if rate == 2000 else f"month-{rate}"
     evict(root)
     guard(root)
     if mode == 'monitor':
         month = archive.latest_month()
     else:
-        row = con.execute("SELECT value FROM settings WHERE name='month'").fetchone()
+        row = con.execute("SELECT value FROM settings WHERE name=?",(cursor_name,)).fetchone()
         month = row[0] if row else archive.first_month
     for rec in choose(con,month,mode,archive):
         identity = hashlib.sha256((rec.key+rec.etag).encode()).hexdigest()[:24]
         header = root/'cache'/f'{identity}-header.bin'
         archive.fetch(rec,0,min(8191, rec.size-1),header)
         base,width,frames = archive.layout(header.read_bytes(),rec.size)
-        stride = dsp.RATE*dsp.WINDOW
+        stride = rate*dsp.WINDOW
         # Index offsets by timestamp, so monitoring and backfill cannot double-count.
         done = {r[0] for r in con.execute('SELECT offset FROM windows WHERE key=? AND etag=?',(rec.key,rec.etag))}
         offsets = range(0, frames-stride+1, stride)
@@ -135,16 +139,16 @@ def work(con, root, mode, archive: Archive = PRIMARY):
         acquired = now()
         raw = path.read_bytes()
         x = dsp.decode(raw,width)
-        power, candidate = dsp.detect(x)
-        stamp = rec.start + timedelta(seconds=offset/dsp.RATE)
+        power, candidate = dsp.detect(x,rate)
+        stamp = rec.start + timedelta(seconds=offset/rate)
         public = root/'public/data'
         ident = f'{identity}-{offset}'
         payload = dict(source_id=rec.key, source_url=archive.source_url(rec),etag=rec.etag,
                        source_sha256=hashlib.sha256(raw).hexdigest(),byte_start=left, byte_length=len(raw),
                        recorded_at=stamp.isoformat(),mode=mode,location=archive.location,
                        archive_modified_at=rec.modified,publication_delay_seconds=None,
-                       acquired_at=acquired,duration_seconds=dsp.WINDOW,algorithm=dsp.VERSION,
-                       sample_rate_hz=dsp.RATE, pcm_bits=width*8, object_size=rec.size, audio_frames=frames,
+                       acquired_at=acquired,duration_seconds=dsp.WINDOW,algorithm=dsp.VERSION if rate==2000 else "spectral-excess-16k-v1",
+                       sample_rate_hz=rate, pcm_bits=width*8, object_size=rec.size, audio_frames=frames,
                        header_sha256=hashlib.sha256(header.read_bytes()[:base]).hexdigest(),
                        zero_fraction=float((x==0).mean()),spectrogram_url=f'/data/{ident}.png')
         first_seen = con.execute('SELECT seen FROM sightings WHERE key=? AND etag=?',(rec.key,rec.etag)).fetchone()[0]
@@ -152,23 +156,23 @@ def work(con, root, mode, archive: Archive = PRIMARY):
         event = None
         if candidate:
             sample,hz,score = candidate
-            clipraw = raw[sample*width:(sample+dsp.RATE*dsp.CLIP)*width]
+            clipraw = raw[sample*width:(sample+rate*dsp.CLIP)*width]
             folder = public/'events'/ident
             if not folder.exists():
                 with tempfile.TemporaryDirectory(dir=root/'tmp') as tmp:
                     stage = Path(tmp)/ident
                     stage.mkdir()
-                    dsp.evidence(clipraw,width,x[sample:sample+dsp.CLIP*dsp.RATE],stage)
+                    dsp.evidence(clipraw,width,x[sample:sample+dsp.CLIP*rate],stage,rate)
                     stage.rename(folder)
             prefix = f'/data/events/{ident}'
-            event = dict(id=ident, recorded_at=(stamp+timedelta(seconds=sample/dsp.RATE)).isoformat(),
-                         duration_seconds=dsp.CLIP,frequency_hz=hz,score_db=score,source_id=rec.key,
+            event = dict(id=ident, recorded_at=(stamp+timedelta(seconds=sample/rate)).isoformat(),
+                         sample_rate_hz=rate,duration_seconds=dsp.CLIP,frequency_hz=hz,score_db=score,source_id=rec.key,
                          source_url=archive.source_url(rec),group_id=None,classification='Unreviewed anomaly',
                          location=archive.location,audio_url=prefix+'/listen.ogg',lossless_url=prefix+'/original.wav',
                          waveform_url=prefix+'/wave.png',spectrogram_url=prefix+'/spectrum.png',
                          byte_start=left+sample*width,byte_length=len(clipraw),etag=rec.etag,
-                         sha256=hashlib.sha256(clipraw).hexdigest(),algorithm=dsp.VERSION,
-                         reference_comparison=compare(x[sample:sample+dsp.RATE*dsp.CLIP]))
+                         sha256=hashlib.sha256(clipraw).hexdigest(),algorithm=dsp.VERSION if rate==2000 else "spectral-excess-16k-v1",
+                         reference_comparison=compare(resample_poly(x[sample:sample+rate*dsp.CLIP],1,rate//2000)))
             json_write(public/'events'/f'{ident}.json',event)
         image = public/f'{ident}.png'
         dsp.spectrogram(power,image.with_suffix('.tmp'))
@@ -182,20 +186,23 @@ def work(con, root, mode, archive: Archive = PRIMARY):
         return
     if mode=='backfill' and month < datetime.now(timezone.utc).strftime('%Y/%m/'):
         with con:
-            con.execute("INSERT OR REPLACE INTO settings VALUES('month',?)",(next_month(month),))
+            con.execute("INSERT OR REPLACE INTO settings VALUES(?,?)",(cursor_name,next_month(month)))
 
 
 def publish(con,root,status):
     public = root/'public/data'
     assign(con,public)
-    agg = con.execute("""SELECT count(*), coalesce(sum(frames),0)/2000., coalesce(sum(bytes),0),
-      sum(seconds), count(event), coalesce(sum(CASE WHEN mode='backfill' THEN frames ELSE 0 END),0)/7200000.
+    agg = con.execute("""SELECT count(*), coalesce(sum(json_extract(payload,'$.duration_seconds')),0), coalesce(sum(bytes),0),
+      sum(seconds), count(event), coalesce(sum(CASE WHEN mode='backfill' THEN json_extract(payload,'$.duration_seconds') ELSE 0 END),0)/3600.
       FROM windows""").fetchone()
     latest = con.execute("SELECT payload FROM windows ORDER BY (mode='monitor') DESC, rowid DESC LIMIT 1").fetchone()
     last = con.execute('SELECT payload FROM windows ORDER BY rowid DESC LIMIT 1').fetchone()
     latest = json.loads(latest[0]) if latest else None
     events = [json.loads(r[0]) for r in con.execute('SELECT event FROM windows WHERE event IS NOT NULL ORDER BY rowid DESC LIMIT 100')]
-    stats = dict(hours_analyzed=agg[1]/3600,coverage_seconds=agg[1],bytes_processed=agg[2],
+    unique_seconds = con.execute("""SELECT coalesce(sum(duration),0) FROM (
+        SELECT max(json_extract(payload,'$.duration_seconds')) AS duration FROM windows
+        GROUP BY json_extract(payload,'$.location'),json_extract(payload,'$.recorded_at'))""").fetchone()[0]
+    stats = dict(hours_analyzed=agg[1]/3600,coverage_seconds=unique_seconds,bytes_processed=agg[2],
                  processing_speed=agg[1]/agg[3] if agg[3] else None,events=agg[4],backfill_hours=agg[5],
                  recurring_groups=con.execute('SELECT count(*) FROM families WHERE recurring=1').fetchone()[0],reviewed=con.execute('SELECT count(DISTINCT id) FROM reviews').fetchone()[0],storage_bytes=storage(root),uptime_seconds=None,
                  last_acquisition=json.loads(last[0])['acquired_at'] if last else None,
@@ -239,6 +246,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('mode',choices=['monitor','backfill','both'])
     parser.add_argument('--state',type=Path,required=True)
+    parser.add_argument('--rate',type=int,choices=(2000,16000),default=16000)
     args = parser.parse_args()
     root = args.state.resolve()
     for name in ['db','cache','tmp','logs','public/data/events']:
@@ -258,7 +266,7 @@ def main():
                     continue
                 if os.environ.get('ENABLE_'+mode.upper(),'1')=='1':
                     publish(con,root,'Analyzing '+mode+' window')
-                    work(con,root,mode)
+                    work(con,root,mode,mbari.PacificSound(args.rate))
                     publish(con,root,'Waiting for next acquisition')
         except Exception:
             logging.exception('Worker run failed')

@@ -55,3 +55,10 @@ Similar background noise or instrument response may produce a high coefficient. 
 ```sh
 python3 -m research.build_descriptors "$STATE/research" | diff - classification/reference_bands.json
 ```
+
+
+## Additional archive candidates
+
+- Orcasound offers Salish Sea hydrophone streams, archived audio and annotated bouts. The registry lists typical latency of 10–120 seconds and CC BY-NC-SA 4.0. Preserve that license and distinguish lossy stream audio from lossless sources. [AWS registry](https://registry.opendata.aws/orcasound/)
+- AWI PALAOA's early-2022 Antarctic deployment recorded at 96 kHz and 155 m depth. Daily tar files contain ten-minute WAV members under CC BY 4.0. Verify range support and member offsets before adding a bounded downloader. [PANGAEA dataset](https://doi.pangaea.de/10.1594/PANGAEA.962533)
+- NOAA/NPS Noise Reference Stations offer multiyear regional comparisons in the 10–2,000 Hz band. Retain the original station bandwidth and check deployment metadata and use constraints. [NOAA network](https://www.pmel.noaa.gov/acoustics/noaanps-ocean-noise-reference-station-network/) · [Archive](https://www.ncei.noaa.gov/access/metadata/landing-page/bin/iso?id=gov.noaa.ngdc.mgg.pad%3ANRS_Raw_Data)

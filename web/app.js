@@ -58,7 +58,7 @@ function spectrogram(e,caption) {
   const img=plot.querySelector("img");
   if (!img) return plot;
   const axis=el("div","plot-area"), freq=el("div","freq-axis");
-  for (const tick of ["1 kHz","500 Hz","0 Hz"]) freq.append(el("span","",tick));
+  for (const tick of (e.sample_rate_hz===16000?["8 kHz","4 kHz","0 Hz"]:["1 kHz","500 Hz","0 Hz"])) freq.append(el("span","",tick));
   const time=el("div","time-axis");
   for(const ratio of [0,.25,.5,.75,1]) time.append(el("span","",num(e.duration_seconds*ratio)+" s"));
   plot.prepend(axis);axis.append(freq,img,time);return plot;
@@ -113,7 +113,7 @@ function observatory(view) {
   plot.append(facts([["Recording time",when(latest.recorded_at)],["Processed",when(latest.processed_at)],["Analyzed interval",elapsed(latest.duration_seconds)]],"measurements"));
   const site=el("section","panel pad");
   site.append(el("p","label","Hydrophone"),el("h2","",latest.location||"Monterey Bay"),facts([
-    ["Archive","MBARI Pacific Sound · 2 kHz"],["Archive modification time",when(latest.archive_modified_at)],
+    ["Archive","MBARI Pacific Sound · "+((latest.sample_rate_hz||2000)/1000)+" kHz"],["Archive modification time",when(latest.archive_modified_at)],
     ["Publication delay",elapsed(latest.publication_delay_seconds)],
     ...(latest.first_seen_lag_seconds!=null?[["Recording to project’s first observation",elapsed(latest.first_seen_lag_seconds)]]:[]),["Last reported processing status",state.status||"Unknown"],
     ["Historical coverage",num(stats.backfill_hours,3)+" h"]
@@ -191,7 +191,7 @@ async function detail(id,view) {
 }
 function statistics(view) {
   const s=state.stats||{}, grid=el("div","stats");
-  for (const [label,value] of [["Analyzed audio",num(s.hours_analyzed,3)+" h"],["Source data processed",bytes(s.bytes_processed)],["Historical coverage",num(s.backfill_hours,3)+" h"],["Processing speed",num(s.processing_speed,2)+"× real time"],["Detected events",num(s.events,0)],["Recurring unidentified groups",num(s.recurring_groups,0)],["Human-reviewed events",num(s.reviewed,0)],["Inventoried source files",num(s.inventoried_files,0)],["All-zero intervals",num(s.silent_windows,0)],["Storage used",bytes(s.storage_bytes)],["Worker heartbeat streak",elapsed(s.uptime_seconds)],["Last successful acquisition",when(s.last_acquisition)]]) {
+  for (const [label,value] of [["Analyzed audio",num(s.hours_analyzed,3)+" h"],["Distinct recording time",elapsed(s.coverage_seconds)],["Source data processed",bytes(s.bytes_processed)],["Historical coverage",num(s.backfill_hours,3)+" h"],["Processing speed",num(s.processing_speed,2)+"× real time"],["Detected events",num(s.events,0)],["Recurring unidentified groups",num(s.recurring_groups,0)],["Human-reviewed events",num(s.reviewed,0)],["Inventoried source files",num(s.inventoried_files,0)],["All-zero intervals",num(s.silent_windows,0)],["Storage used",bytes(s.storage_bytes)],["Worker heartbeat streak",elapsed(s.uptime_seconds)],["Last successful acquisition",when(s.last_acquisition)]]) {
     const item=el("div","panel metric");item.append(el("small","",label),el("strong","",value));grid.append(item);
   }
   view.append(grid,el("p","muted small","Archive coverage is reported in analyzed hours. The total duration of available archive recordings has yet to be inventoried."),el("p","small muted","Snapshot generated "+when(state.generated_at)));
@@ -206,7 +206,7 @@ function research(view) {prose(view,[
   ["What recurs in the deep ocean?","We measure changes in underwater sound and preserve excerpts for review. Our first question is whether similar narrowband events recur across independent recording dates at the Monterey Accelerated Research System hydrophone.",[["Study protocol",repository+"/blob/main/RESEARCH.md"]]],
   ["From recording to candidate","The baseline measures spectral energy against local background. Each candidate links its analysis to an archive identifier and recording time. Human review is needed to attribute a source. A quiet analyzed interval contributes to coverage even when it yields no candidates.",[["Experiment results","#statistics"],["Inspect candidates","#discoveries"]]],
   ["Coastal fish choruses","UF310 and UF440 are reference targets from California sanctuary studies. Their coastal recordings and Monterey Bay’s deep offshore observations differ in habitat, propagation and instrumentation. Frequency alone cannot identify a chorus.",[["Kim et al., ICES Journal of Marine Science","https://doi.org/10.1093/icesjms/fsag096"],["Dryad annotations","https://doi.org/10.5061/dryad.q2bvq83sw"]]],
-  ["Limits of the observations","The 2 kHz source constrains detectable frequencies to below 1 kHz. Weather, vessels, instruments and biological sources can produce overlapping signatures. Audited examples and independent held-out recordings are needed to estimate sensitivity and false alarms.",[["MBARI archive",sourceRegistry],["Pacific Sound documentation","https://docs.mbari.org/pacific-sound/"]]]
+  ["Limits of the observations","The 16 kHz source covers frequencies below 8 kHz. Earlier 2 kHz excerpts cover frequencies below 1 kHz. Weather, vessels, instruments and biological sources can produce overlapping signatures. Audited examples and independent held-out recordings are needed to estimate sensitivity and false alarms.",[["MBARI archive",sourceRegistry],["Pacific Sound documentation","https://docs.mbari.org/pacific-sound/"]]]
 ]);}
 function contribute(view){prose(view,[
   ["Reproduce a recording","Start with a candidate’s permanent link, note its source identifier and UTC timestamp, then follow the repository setup and processing instructions.",[["Start here",repository+"/blob/main/START_HERE.md"],["Source code",repository]]],

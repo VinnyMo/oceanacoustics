@@ -22,12 +22,13 @@ def decode(raw, width):
     return value.astype('f4') / (2 ** (width * 8 - 1))
 
 
-def spectrum(x):
-    return np.abs(stft(x, RATE, nperseg=256, noverlap=192, boundary=None, padded=False)[2])
+def spectrum(x, rate=RATE):
+    bins = 256 * (rate // RATE)
+    return np.abs(stft(x, rate, nperseg=bins, noverlap=3*bins//4, boundary=None, padded=False)[2])
 
 
-def detect(x):
-    power = spectrum(x)
+def detect(x, rate=RATE):
+    power = spectrum(x, rate)
     db = 20 * np.log10(np.maximum(power, 1e-9))
     excess = db - np.median(db, axis=1, keepdims=True)
     # Require sustained excess across roughly 0.35 s to suppress single-frame impulses.
@@ -35,7 +36,7 @@ def detect(x):
     band, frame = np.unravel_index(np.argmax(score), score.shape)
     peak = float(score[band, frame])
     center = ((frame + 5)*64 + 128)/RATE
-    start = int(np.clip(center - CLIP/2, 0, len(x)/RATE - CLIP)*RATE)
+    start = int(np.clip(center - CLIP/2, 0, len(x)/rate - CLIP)*rate)
     result = (start, float((band+3)*RATE/256), peak) if peak >= 12 and np.max(power[band+3]) > 1e-7 else None
     return power, result
 
@@ -43,19 +44,20 @@ def detect(x):
 def spectrogram(power, dest):
     db = 20*np.log10(np.maximum(power, 1e-9))
     low, high = np.percentile(db, [3, 99.5])
-    v = np.clip((db-low)/max(1,high-low), 0, 1)
+    display = Image.fromarray(db[::-1]).resize((800,240),Image.Resampling.BILINEAR)
+    v = np.clip((np.asarray(display)-low)/max(1,high-low), 0, 1)
     colors = np.array([[5,16,35],[16,47,84],[15,110,135],[79,207,185],[255,218,124]])
     rgb = np.stack([np.interp(v, np.linspace(0,1,5), channel) for channel in colors.T], axis=-1)
-    Image.fromarray(rgb[::-1].astype('uint8')).resize((800,240)).save(dest, format='PNG')
+    Image.fromarray(rgb.astype('uint8')).save(dest, format='PNG')
 
 
-def evidence(raw, width, x, folder):
+def evidence(raw, width, x, folder, rate=RATE):
     with wave.open(str(folder/'original.wav'), 'wb') as w:
-        w.setparams((1,width,RATE,0,'NONE',''))
+        w.setparams((1,width,rate,0,'NONE',''))
         w.writeframes(raw)
     subprocess.run(['ffmpeg','-nostdin','-loglevel','error','-threads','1','-filter_threads','1','-y','-i',str(folder/'original.wav'),
                     '-ar','48000','-c:a','libopus','-b:a','48k','-threads','1',str(folder/'listen.ogg')],check=True)
-    spectrogram(spectrum(x), folder/'spectrum.png')
+    spectrogram(spectrum(x,rate), folder/'spectrum.png')
     img = Image.new('RGB',(600,96),'#091e34')
     pen = ImageDraw.Draw(img)
     scale = 44 / max(1e-10,np.max(np.abs(x)))

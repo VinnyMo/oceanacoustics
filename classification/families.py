@@ -10,9 +10,10 @@ VERSION = 'spectral-shape-v1'
 
 def fingerprint(path):
     with wave.open(str(path), 'rb') as w:
+        rate = w.getframerate()
         x = decode(w.readframes(w.getnframes()), w.getsampwidth())
     # Take the 80th percentile magnitude in each frequency bin, then pool adjacent bins.
-    profile = np.percentile(spectrum(x)[1:], 80, axis=1).reshape(32, 4).mean(axis=1)
+    profile = np.percentile(spectrum(x, rate)[1:], 80, axis=1).reshape(-1, 4).mean(axis=1)
     profile = np.sqrt(profile)
     return profile / max(1e-12, np.linalg.norm(profile))
 
@@ -33,7 +34,10 @@ def assign(con, public):
         best, similarity = None, 0.97
         for family in con.execute('SELECT * FROM families WHERE hz BETWEEN ? AND ? ORDER BY id',
                                   (hz-8,hz+8)):
-            score = float(vec @ json.loads(family['vector']))
+            exemplar = json.loads(family['vector'])
+            if len(exemplar) != len(vec):
+                continue
+            score = float(vec @ exemplar)
             if score >= similarity:
                 best, similarity = family, score
         with con:

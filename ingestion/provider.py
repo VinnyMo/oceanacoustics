@@ -1,4 +1,4 @@
-"""Interface for public, UTC-indexed mono PCM archives consumed by the 2 kHz worker."""
+"""Interface for public, UTC-indexed mono PCM archives consumed by the worker."""
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Protocol
@@ -13,6 +13,7 @@ class SourceObject(Protocol):
 
 
 class Archive(Protocol):
+    rate: int
     location: str
     first_month: str
 

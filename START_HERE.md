@@ -1,6 +1,6 @@
 # Start here
 
-The primary source is MBARI 2 kHz PCM. This repository contains software, configuration, numeric reference descriptors and research documentation. Live measurements come from the host database. See the [initial measured baseline](benchmarks/pilot.md) and [operating procedures](docs/operations.md).
+The default source is MBARI 16 kHz PCM. Launch observations use 2 kHz PCM. This repository contains software, configuration, numeric reference descriptors and research documentation. Live measurements come from the host database. See the [initial measured baseline](benchmarks/pilot.md) and [operating procedures](docs/operations.md).
 
 | Component | Entry point |
 |---|---|

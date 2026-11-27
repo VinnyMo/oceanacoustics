@@ -29,7 +29,7 @@ def report(root):
                 previous=right
             if frames is None or previous<frames:
                 gaps.append([previous,frames])
-            yield dict(source_id=key,etag=etag,rate_hz=2000,analyzed_sample_ranges=covered,
+            yield dict(source_id=key,etag=etag,rate_hz=16000 if key.endswith("-16kHz.wav") else 2000,analyzed_sample_ranges=covered,
                        unprocessed_sample_ranges=gaps,all_zero_windows=sum(json.loads(r[2])['zero_fraction']==1 for r in rows))
 
 

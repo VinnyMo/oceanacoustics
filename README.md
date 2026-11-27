@@ -4,7 +4,7 @@ An open research observatory for public hydrophone recordings. Explore the measu
 
 [Observatory](https://oceanacoustics.vincentmossman.com) · [Get started](START_HERE.md) · [Research protocol](RESEARCH.md) · [Source audit](docs/sources.md) · [Pilot results](benchmarks/pilot.md)
 
-A CPU worker discovers MBARI Pacific Sound objects, acquires version-checked 2 kHz PCM ranges, and writes SQLite WAL records plus static website data. Nginx serves the dashboard, audio and images. Monitoring and historical backfill run independently under one resource-limited timer. The public application accepts no writes.
+A CPU worker discovers MBARI Pacific Sound objects, acquires version-checked native 16 kHz PCM ranges, and writes SQLite WAL records plus static website data. Nginx serves the dashboard, audio and images. Monitoring and historical backfill run independently under one resource-limited timer. The public application accepts no writes.
 
 ## Local run
 

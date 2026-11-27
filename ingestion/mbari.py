@@ -10,15 +10,15 @@ from datetime import datetime, timezone
 
 BASE = 'https://pacific-sound-2khz.s3.us-west-2.amazonaws.com/'
 NS = {'s': 'http://s3.amazonaws.com/doc/2006-03-01/'}
-KEY = re.compile(r'\d{4}/\d{2}/MARS-(\d{8}T\d{6}Z)-2kHz\.wav')
+KEY = re.compile(r'\d{4}/\d{2}/MARS-(\d{8}T\d{6}Z)-(?:2|16)kHz\.wav')
 
 
-def listing(prefix, delimiter=None):
+def listing(prefix, delimiter=None, base=BASE):
     params = {'list-type': '2', 'prefix': prefix}
     if delimiter:
         params['delimiter'] = delimiter
     while True:
-        with urllib.request.urlopen(BASE + '?' + urllib.parse.urlencode(params), timeout=30) as r:
+        with urllib.request.urlopen(base + '?' + urllib.parse.urlencode(params), timeout=30) as r:
             root = ET.fromstring(r.read(2_000_000))
         yield root
         token = root.findtext('s:NextContinuationToken', namespaces=NS)
@@ -27,8 +27,8 @@ def listing(prefix, delimiter=None):
         params['continuation-token'] = token
 
 
-def prefixes(prefix):
-    return sorted(e.text for root in listing(prefix, '/') for e in root.findall('s:CommonPrefixes/s:Prefix', NS))
+def prefixes(prefix, base=BASE):
+    return sorted(e.text for root in listing(prefix, '/', base) for e in root.findall('s:CommonPrefixes/s:Prefix', NS))
 
 
 @dataclass(frozen=True)
@@ -43,8 +43,8 @@ class Recording:
         return datetime.strptime(KEY.fullmatch(self.key)[1], '%Y%m%dT%H%M%SZ').replace(tzinfo=timezone.utc)
 
 
-def records(prefix):
-    for root in listing(prefix):
+def records(prefix, base=BASE):
+    for root in listing(prefix, base=base):
         for element in root.findall('s:Contents', NS):
             key = element.findtext('s:Key', namespaces=NS)
             if KEY.fullmatch(key):
@@ -99,17 +99,23 @@ class PacificSound:
     location = 'Monterey Accelerated Research System, offshore California'
     first_month = '2015/07/'
 
+    def __init__(self, rate=16000):
+        if rate not in (2000,16000):
+            raise ValueError('Supported archive rates are 2000 and 16000 Hz')
+        self.rate = rate
+        self.base = f'https://pacific-sound-{rate//1000}khz.s3.us-west-2.amazonaws.com/'
+
     def latest_month(self):
-        return prefixes(prefixes('')[-1])[-1]
+        return prefixes(prefixes('', self.base)[-1], self.base)[-1]
 
     def records(self, month):
-        return records(month)
+        return records(month, self.base)
 
     def source_url(self, recording):
-        return BASE + recording.key
+        return self.base + recording.key
 
     def fetch(self, recording, first, last, target):
-        fetch(recording,first,last,target)
+        fetch(recording,first,last,target,base=self.base)
 
     def layout(self, header, size):
-        return layout(header,size)
+        return layout(header,size,self.rate)
