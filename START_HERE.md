@@ -21,4 +21,6 @@ Pip publishes a searchable listening index at `/data/showcase.json` with individ
 3. Inspect the actual timer and public snapshot before reporting deployment status. The production service was activated on 2026-11-27 UTC. Its first run extended the six-minute pilot to eight minutes. Public HTTPS and ranged audio delivery passed. Use the live snapshot for current counts.
 4. Handle human review offline. The [source audit](docs/sources.md) documents the reference excerpts and evaluation split. Held-out performance, deployment-aware calibration, broader coverage and long-term operational validation are open work.
 
+The [environment guide](docs/environment.md) covers the globe, verified positions, current model refresh, recording-hour backfill and Pip’s environmental evidence.
+
 The service checkout is under `/srv/oceanacoustics/releases/<commit>`. Research state is under `/srv/oceanacoustics/state`. The development checkout and pilot live under the operator's home. Never expose SQLite, logs, raw cache, research reference files, credentials or the home directory through Nginx.

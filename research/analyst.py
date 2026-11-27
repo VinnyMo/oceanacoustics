@@ -20,7 +20,7 @@ from processing.dsp import decode
 from research.curator import GENRES, MOODS
 
 MODEL='gpt-audio-1.5'
-VERSION='listening-notes-v2'
+VERSION='listening-notes-v3'
 KEY_PATH=Path('/etc/oceanacoustics/openai.key')
 PROMPT="""You are Pip, the resident acoustic curator. Write for a visitor who is listening along. Listen to the attached
 six seconds. Use the measured metadata and the current coverage of the experiment. Describe
@@ -34,12 +34,15 @@ value of human review. Add title (under 80 characters, describing the audible fe
 genre (the best-supported possible source from GENRES, otherwise Unidentified) and mood
 (one listening impression from MOODS or null). Spooky is a subjective impression. Only suggest
 whales or dolphins when audible structure supports the hypothesis; frequency and site alone
-are insufficient. Use plain, specific language and point out what to listen for. No markdown."""
+are insufficient. Use available recording-hour surface model estimates only as environmental context; they cannot establish the acoustic source or conditions at hydrophone depth. Explicitly acknowledge missing context when relevant. Use plain, specific language and point out what to listen for. No markdown."""
 
 
 def schema(con):
     con.execute("""CREATE TABLE IF NOT EXISTS ai_notes(id TEXT PRIMARY KEY, station TEXT, requested TEXT,
         model TEXT, version TEXT, state TEXT, note TEXT, usage TEXT, audio_hash TEXT, request_id TEXT)""")
+
+
+    con.execute("CREATE TABLE IF NOT EXISTS ai_environment(id TEXT PRIMARY KEY, context TEXT NOT NULL)")
 
 
 # Microdollars, using standard gpt-audio-1.5 prices. A bounded six-second
@@ -164,6 +167,10 @@ def analyze(con,root,queue,quality,enabled=True):
     evidence={k:e.get(k) for k in ('recorded_at','frequency_hz','score_db','sample_rate_hz','native_rate',
                                     'duration_seconds','location','group_id','classification','quality','source_encoding')}
     evidence.update(GENRES=GENRES,MOODS=MOODS,coverage=quality,listening_gain_db=gain,processing='DC removed, level adjusted, original timing and pitch')
+    context=e.get('environment') or {}
+    evidence['recording_environment']=dict(hour=context.get('hour'),position=context.get('position'),
+        surface_models={k:{field:v for field,v in reading.items() if field in ('valid_at','grid','product','values')}
+                        for k,reading in context.get('conditions',{}).items()})
     previous=con.execute("SELECT note FROM ai_notes WHERE state='complete' ORDER BY requested DESC LIMIT 3").fetchall()
     evidence['prior_questions']=[json.loads(row[0])['check'] for row in previous]
     if len(PROMPT.encode())+len(json.dumps(evidence).encode())>8000:
@@ -171,6 +178,7 @@ def analyze(con,root,queue,quality,enabled=True):
     with con:
         con.execute('INSERT INTO ai_notes VALUES(?,?,?,?,?,?,?,?,?,?)',(e['id'],e['location'],when,MODEL,
                     VERSION,'reserved',None,None,hashlib.sha256(audio).hexdigest(),None))
+        con.execute('INSERT INTO ai_environment VALUES(?,?)',(e['id'],json.dumps(evidence['recording_environment'])))
     try:
         note,usage,request_id,model=request_note(key,audio,evidence)
         with con:

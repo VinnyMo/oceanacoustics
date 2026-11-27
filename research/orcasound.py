@@ -64,5 +64,5 @@ def sample(station,sequence,workdir):
         raise ValueError('Short HLS segment')
     return dict(recorded_at=stamp.astimezone(timezone.utc).isoformat(),source_url=url,source_id=node+'/'+epoch+'/'+segment,
                 native_rate=rate,attribution='Orcasound • '+STATIONS[node],public_audio=True,
-                license_url='https://creativecommons.org/licenses/by-nc-sa/4.0/',source_encoding='HLS AAC',quality=quality,
+                license_url='https://creativecommons.org/licenses/by-nc-sa/4.0/',source_encoding='HLS AAC',bytes_acquired=len(raw),quality=quality,
                 source_sha256=hashlib.sha256(raw).hexdigest()),samples

@@ -11,3 +11,22 @@
 .showcase-tools select{min-height:42px}.showcase-slot{min-width:0}.showcase-slot .card{height:100%}
 .showcase .links{margin-top:16px}.curator-note{margin-block:20px;padding:16px 20px;border-left:3px solid var(--accent);background:#102834}
 #research-coverage .stats{gap:9px}#research-coverage .metric{padding:14px 16px}
+
+.atlas{overflow:hidden;margin:0 0 28px}
+.atlas-top,.atlas-foot{padding:16px clamp(16px,3vw,30px)}
+.atlas-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--line)}
+.atlas-head h2,.atlas-head .label{margin:0}.atlas-top select{margin-left:5px}
+.atlas-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(285px,1fr);align-items:start}
+.globe-stage{position:relative;background:radial-gradient(ellipse at 52% 44%,#123345,#071723 76%);min-width:0}
+.globe-stage canvas{width:100%;height:auto;display:block;touch-action:none;cursor:grab}.globe-stage canvas:active{cursor:grabbing}
+.globe-hint{padding:0 18px 16px;color:#aec6ce;font-size:.8rem}.globe-zoom{position:absolute;top:10px;right:10px;display:flex;gap:5px}
+.globe-zoom button{cursor:pointer;min-width:32px}.station-side{padding:18px;min-width:0}
+.station-side label{display:grid;gap:4px;margin:0 0 10px;color:var(--muted);font-size:.85rem}
+.station-side select{max-width:100%;min-width:0}.map-clip>*{margin:10px 0}.station-model{border-top:1px solid var(--line);padding:10px 0}
+.station-model summary{cursor:pointer;font-weight:600}.model-reading{margin-top:12px;font-size:.85rem}.model-reading>span{display:block}
+.env-values{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}.env-values dd{margin:0}
+.atlas-foot{border-top:1px solid var(--line)}.atlas-foot p{margin:3px 0}.recording-context{margin:16px 0}.inventory-wrap{overflow-x:auto}
+.inventory{width:100%;border-collapse:collapse;text-align:left;font-size:.88rem}.inventory th,.inventory td{padding:10px 12px;border-bottom:1px solid var(--line)}
+.inventory th{color:var(--accent)}@media(max-width:760px){.atlas-grid{grid-template-columns:1fr}.atlas-top{padding:14px}.atlas-top select{max-width:170px}}
+
+.sample-info:not(:empty){padding:0 18px 14px}.sample-info:empty{display:none}

@@ -13,7 +13,7 @@ from scipy.signal import welch
 
 from processing import dsp
 from processing.listening import add_listening
-from research import analyst,curator,noaa_sources,orcasound,polar
+from research import analyst,curator,environment,noaa_sources,orcasound,polar
 
 
 def stations():
@@ -119,6 +119,9 @@ def update(con,root,acquire=True,enable_ai=True):
                     coalesce(sum(json_extract(event,'$.rail_fraction')>0),0),
                     coalesce(sum(json_extract(event,'$.zero_fraction')=1),0) FROM source_samples""").fetchone()
     quality.update(source_quality_n=sq[0],rail_samples=sq[1],zero_source_samples=sq[2])
+    mapped,grid=environment.enrich(con,events,acquire)
+    json_write(public/'globe.json',dict(generated_at=now(),sites=mapped,grid=grid))
+    inventory=environment.inventory(con,events)
     queue=analyst.ranked(events,con)
     status=analyst.analyze(con,root,queue,quality,enable_ai)
     quality['ai_attempts']=con.execute('SELECT count(*) FROM ai_notes').fetchone()[0]
@@ -132,5 +135,5 @@ def update(con,root,acquire=True,enable_ai=True):
                           title=curator.catalog_note(event,note)['title']))
     quality.update(analyst.monthly_budget(con,now()))
     quality['cataloged']=curator.publish_catalog(con,public,events)
-    json_write(public/'research.json',dict(generated_at=now(),status=status,quality=quality,
+    json_write(public/'research.json',dict(generated_at=now(),status=status,quality=quality,inventory=inventory,
                notes=notes,queue=analyst.ranked(events,con)[:12],sources=[mbari,*sites],source_clips=archive))

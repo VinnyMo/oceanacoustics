@@ -1,0 +1,460 @@
+{
+ "positions": {
+  "mbari/mars": [
+   36.712468333333334,
+   -122.18689833333333,
+   "mars",
+   "MARS observatory node"
+  ],
+  "nrs_01_2014-2015": [
+   72.49,
+   -156.6018,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_01_2015-2017": [
+   72.443,
+   -156.6018,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_02_2015-2016": [
+   50.249,
+   -145.1499,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_03_2014-2015": [
+   47.7651,
+   -125.5222,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_04_2015-2016": [
+   22.33,
+   -157.667,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_05_2014-2015": [
+   33.9,
+   -119.582,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_06_2014-2016": [
+   28.0062,
+   -86.9937,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_06_2016-2018": [
+   28.2502,
+   -86.8327,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_08_2014-2015": [
+   40.13,
+   -66.2499,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_08_2016-2018": [
+   39.0103,
+   -67.2706,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_09_2014-2015": [
+   42.4037,
+   -70.1294,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_09_2016-2017": [
+   42.4037,
+   -70.12,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_10_2015-2016": [
+   -14.2686,
+   -170.7196,
+   "NRS",
+   "Published deployment position"
+  ],
+  "nrs_12_2017-2018": [
+   17.785,
+   -64.65,
+   "NRS",
+   "Published deployment position"
+  ],
+  "orcasound/rpi_andrews_bay": [
+   48.546653,
+   -123.166408,
+   "orca",
+   "Published station position"
+  ],
+  "orcasound/rpi_bush_point": [
+   48.0336664,
+   -122.6040035,
+   "orca",
+   "Published station position"
+  ],
+  "orcasound/rpi_north_sjc": [
+   48.591294,
+   -123.058779,
+   "orca",
+   "Published station position"
+  ],
+  "orcasound/rpi_orcasound_lab": [
+   48.5583362,
+   -123.1735774,
+   "orca",
+   "Published station position"
+  ],
+  "orcasound/rpi_port_townsend": [
+   48.135743,
+   -122.760614,
+   "orca",
+   "Published station position"
+  ],
+  "orcasound/rpi_sunset_bay": [
+   47.86497296593844,
+   -122.33393605795372,
+   "orca",
+   "Published station position"
+  ],
+  "pangaea/962533": [
+   -70.523,
+   -8.23,
+   "962533",
+   "Published deployment position"
+  ],
+  "pangaea/973171": [
+   -63.9943,
+   -0.0445,
+   "973171",
+   "Published deployment position"
+  ],
+  "pangaea/981192": [
+   -64.02096,
+   -0.07712500000002365,
+   "981192",
+   "Center of published deployment extent"
+  ],
+  "pangaea/982321": [
+   -61.0216865,
+   -55.982399000000015,
+   "982321",
+   "Center of published deployment extent"
+  ],
+  "pangaea/986812": [
+   -66.5147155,
+   -0.0820045000000107,
+   "986812",
+   "Center of published deployment extent"
+  ],
+  "sanctsound_ci01_01": [
+   34.0438,
+   -120.0811,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_ci01_02": [
+   34.0438,
+   -120.08105,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_ci01_03": [
+   34.04383,
+   -120.081,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_ci02_01": [
+   34.0856,
+   -120.5232,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_ci02_02": [
+   34.0854,
+   -120.5233,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_ci02_03": [
+   34.08532,
+   -120.523,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_ci03_02": [
+   33.48687,
+   -119.01609,
+   "ci03_02",
+   "Published deployment position"
+  ],
+  "sanctsound_ci04_01": [
+   33.849,
+   -120.118,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_ci04_03": [
+   33.84888,
+   -120.117,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_ci05_01": [
+   34.0178,
+   -119.3172,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_ci05_02": [
+   34.0178,
+   -119.3172,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_ci05_03": [
+   34.0178,
+   -119.317,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_fk01_01": [
+   24.43313,
+   -81.93068,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_fk02_01": [
+   24.4888,
+   -81.666316,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_fk03_01": [
+   24.45895,
+   -81.774133,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_gr01_01": [
+   31.396417,
+   -80.8904,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_gr01_02": [
+   31.39641,
+   -80.8904,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_gr02_02": [
+   31.37613,
+   -80.83913,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_gr03_02": [
+   31.36749,
+   -80.895,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_hi01_01": [
+   20.807567,
+   -156.65615,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_hi03_01": [
+   21.2852,
+   -157.599983,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_hi04_01": [
+   22.263528,
+   -159.586528,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_hi05_01": [
+   21.072183,
+   -157.395017,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_mb01_01": [
+   36.798,
+   -121.976,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_mb01_02": [
+   36.798,
+   -121.976,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_mb01_03": [
+   36.798,
+   -121.976,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_mb02_01": [
+   36.648,
+   -121.9084,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_mb02_02": [
+   36.6495,
+   -121.9084,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_mb02_03": [
+   36.6495,
+   -121.9084,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_oc01_01": [
+   48.3938,
+   -124.654,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_oc02_01": [
+   48.4904,
+   -125.0038,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_oc02_02": [
+   48.4905,
+   -125.0039,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_oc04_02": [
+   48.0378,
+   -124.7285,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb01_01": [
+   42.436838,
+   -70.546958,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb01_02": [
+   42.43668,
+   -70.546655,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb01_03": [
+   42.4371,
+   -70.546783,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb01_04": [
+   42.43679,
+   -70.54643,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb01_05": [
+   42.43678,
+   -70.54643,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb02_01": [
+   42.470793,
+   -70.24294,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb02_02": [
+   42.470842,
+   -70.24281,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb02_03": [
+   42.471358,
+   -70.242763,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb02_04": [
+   42.47086,
+   -70.24241,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb02_05": [
+   42.47087,
+   -70.24238,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb03_01": [
+   42.25541,
+   -70.178607,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb03_02": [
+   42.25539,
+   -70.178843,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb03_03": [
+   42.255407,
+   -70.17901,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb03_04": [
+   42.25542,
+   -70.17901,
+   "SANCTSOUND",
+   "Published deployment position"
+  ],
+  "sanctsound_sb03_05": [
+   42.25551,
+   -70.17906,
+   "SANCTSOUND",
+   "Published deployment position"
+  ]
+ },
+ "sources": {
+  "962533": "https://doi.pangaea.de/10.1594/PANGAEA.962533",
+  "973171": "https://doi.pangaea.de/10.1594/PANGAEA.973171",
+  "981192": "https://doi.pangaea.de/10.1594/PANGAEA.981192",
+  "982321": "https://doi.pangaea.de/10.1594/PANGAEA.982321",
+  "986812": "https://doi.pangaea.de/10.1594/PANGAEA.986812",
+  "NRS": "https://storage.googleapis.com/noaa-passive-bioacoustic/big_query_metadata/NCEI_NRS_PAD_metadata.xlsx",
+  "SANCTSOUND": "https://storage.googleapis.com/noaa-passive-bioacoustic/big_query_metadata/NCEI_SANCTSOUND_PAD_metadata.csv",
+  "ci03_02": "https://storage.googleapis.com/noaa-passive-bioacoustic/sanctsound/audio/ci03/sanctsound_ci03_02/metadata/SanctSound_CI03_02.json",
+  "mars": "https://www.mbari.org/technology/monterey-accelerated-research-system-mars/",
+  "orca": "https://live.orcasound.net/api/json/feeds"
+ }
+}

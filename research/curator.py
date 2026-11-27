@@ -49,6 +49,7 @@ def publish_catalog(con, public, events):
         if not e.get('audio_url') or not e.get('public_audio',True):
             continue
         item=catalog_note(e,notes.get(e['id']))
+        item['environment']=e.get('environment')
         json_write(folder/(e['id']+'.json'),item)
         entries.append(dict(id=e['id'],genre=item['genre'],mood=item['mood'],kind=item['kind'],
                             reviewed=item['note'] is not None,priority=(item['note'] or {}).get('priority',0),

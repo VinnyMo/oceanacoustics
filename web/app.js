@@ -3,7 +3,7 @@ const repository = "https://github.com/VinnyMo/oceanacoustics";
 const sourceRegistry = "https://registry.opendata.aws/pacific-sound/";
 const byId = id => document.getElementById(id);
 const pages = {
-  observatory: ["Pacific Sound / MBARI", "Observatory", "Explore the deep-ocean soundscape off Monterey Bay, California."],
+  observatory: ["Ocean Acoustics", "Observatory", "Explore recording sites, listen to underwater sounds, and compare conditions across the oceans."],
   discoveries: ["Acoustic evidence", "Discoveries", "Listen to preserved candidates and compare their acoustic signatures."],
   research: ["Acoustic field notes", "Research", "Listen to the evidence behind each open question."]
 };
@@ -169,6 +169,7 @@ function cards(entries, node,options) {
   node.append(list);
 }
 function observatory(view) {
+  globeView(view);
   const latest=state.latest, stats=state.stats || {};
   if (!latest) {view.append(el("p","empty","Waiting for the first processed recording."));return;}
   const grid=el("div","observ-grid"), plot=el("section","panel pad"), head=el("div","panel-head");
@@ -262,6 +263,7 @@ async function detail(id,view) {
     annotation.append(el("p","label","Pip · "+c.basis),el("h3","",c.title),el("p","",c.explanation));
     if(c.note)annotation.append(facts([["Possible source",c.genre],["Working hypothesis",c.note.hypothesis],["Alternative",c.note.alternative],["Listening check",c.note.check]],"annotations"));
     box.children[2].after(annotation);
+    if(c.environment)box.append(recordingContext(c.environment));
   }
   const related=e.group_id!=null?events().filter(other=>other.id!==e.id&&other.group_id===e.group_id):[];
   if (related.length) {const head=el("div","section-head");const a=link("Browse group →","#discoveries");a.onclick=()=>{group=String(e.group_id);filter=""};head.append(el("h2","","Compare recordings in this group"),a);view.append(head);cards(related.slice(0,6),view);}
@@ -347,6 +349,23 @@ function sourceRecordings(view,data) {
     }
   }else view.append(el("p","empty","Source inventory pending."));
 
+}
+function collectionInventory(view,inv){
+  if(!inv)return;
+  researchHeading(view,"Collection inventory");
+  const matches=inv.context;
+  view.append(el("p","muted",num(inv.events,0)+" stored clips · "+num(matches.located||0,0)+" located · "+
+    num(matches.weather||0,0)+" with recording-hour weather · "+num(matches.marine||0,0)+" with marine data"));
+  const wrap=el("div","inventory-wrap"),table=el("table","inventory"),head=table.createTHead().insertRow();
+  for(const label of ["Collection","Audio type / run","Native rate","Windows or excerpts","Analyzed audio","Metered audio bytes","Recording dates (UTC)"]){
+    const th=el("th","",label);th.scope="col";head.append(th);
+  }
+  const body=table.createTBody();
+  for(const r of inv.rows){
+    const row=body.insertRow();
+    for(const value of [r.source,r.kind,r.rate?num(r.rate/1000,2)+" kHz":"Unknown",num(r.count,0),elapsed(r.seconds),Number.isFinite(r.bytes)?bytes(r.bytes)+(r.metered&&r.metered<r.count?" (partial)":""):"Unavailable",r.first.slice(0,10)+" – "+r.last.slice(0,10)])row.insertCell().textContent=value;
+  }
+  wrap.append(table);view.append(wrap,el("p","figure-note","MBARI counts processed windows, including repeated coverage at different sample rates. Other archives count screened excerpts. Date spans can contain gaps."));
 }
 function researchQuality(view,q) {
   if(!q)return;
@@ -438,6 +457,7 @@ function research(view) {
     browseShowcase(view,showcaseIndex??fallback);
     const coverage=el("section");
     coverage.id="research-coverage";
+    collectionInventory(coverage,researchData.inventory);
     researchQuality(coverage,researchData.quality);
     const ledger=el("details","methods");ledger.append(el("summary","","Processing statistics and recording sources"));
     processingLedger(ledger);sourceRecordings(ledger,researchData);coverage.append(ledger);

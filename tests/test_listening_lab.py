@@ -33,6 +33,8 @@ class Lab(unittest.TestCase):
             analyst.schema(con)
             key=root/'test-key'
             key.write_text('placeholder')
+            e['environment']=dict(hour='2020-01-01T01:00',position=dict(lat=1,lon=2),
+                conditions={'weather':dict(valid_at='2020-01-01T01:00Z',values={'temperature_2m':[6,'°C']})})
             q=dict(ai_limit=1,ai_attempts=0)
             with patch.object(analyst,'KEY_PATH',key),patch.object(analyst,'request_note',side_effect=TimeoutError) as req:
                 self.assertIn('TimeoutError',analyst.analyze(con,root,[e],q))
@@ -40,6 +42,9 @@ class Lab(unittest.TestCase):
                 self.assertEqual(con.execute('select count(*) from ai_notes').fetchone()[0],1)
                 self.assertIn('allowance',analyst.analyze(con,root,[e],dict(q,ai_attempts=1)))
                 req.assert_called_once()
+                context=req.call_args.args[2]['recording_environment']
+                self.assertEqual(context['surface_models']['weather']['values']['temperature_2m'],[6,'°C'])
+                self.assertEqual(json.loads(con.execute('SELECT context FROM ai_environment').fetchone()[0]),context)
             con.close()
 
     def test_archive_inventory_interleaves_providers(self):
