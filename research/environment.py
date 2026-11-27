@@ -200,7 +200,7 @@ def enrich(con,events,acquire=True):
 def inventory(con,events):
     result=[]
     for mode,rate,n,seconds,size,first,last in con.execute("""
-        SELECT mode,coalesce(json_extract(payload,'$.sample_rate_hz'),2000),count(*),sum(seconds),sum(bytes),
+        SELECT mode,coalesce(json_extract(payload,'$.sample_rate_hz'),2000),count(*),sum(json_extract(payload,'$.duration_seconds')),sum(bytes),
         min(json_extract(payload,'$.recorded_at')),max(json_extract(payload,'$.recorded_at'))
         FROM windows GROUP BY 1,2 ORDER BY 1,2"""):
         result.append(dict(source='MBARI Pacific Sound',kind=mode,rate=rate,count=n,seconds=seconds,

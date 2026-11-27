@@ -44,3 +44,11 @@ class EnvironmentalContext(unittest.TestCase):
             pos=env.position(key)
             self.assertTrue(-90<=pos['lat']<=90 and -180<=pos['lon']<=180)
             self.assertTrue(pos['source'].startswith('https://'))
+
+
+    def test_inventory_counts_audio_duration(self):
+        self.con.execute('CREATE TABLE windows(mode TEXT,payload TEXT,seconds REAL,bytes INTEGER)')
+        self.con.execute('INSERT INTO windows VALUES(?,?,?,?)',('backfill',
+            '{"recorded_at":"2015-01-02T00:00:00Z","duration_seconds":60}',1.2,240000))
+        row=env.inventory(self.con,[])['rows'][0]
+        self.assertEqual((row['seconds'],row['count'],row['bytes']),(60,1,240000))
