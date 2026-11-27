@@ -5,7 +5,6 @@ const byId = id => document.getElementById(id);
 const pages = {
   observatory: ["Pacific Sound / MBARI", "Observatory", "Explore the deep-ocean soundscape off Monterey Bay, California."],
   discoveries: ["Acoustic evidence", "Discoveries", "Listen to preserved candidates and compare their acoustic signatures."],
-  statistics: ["Processing ledger", "Statistics", "Measurements from the most recently published processing snapshot."],
   research: ["Acoustic field notes", "Research", "Listen to the evidence behind each open question."]
 };
 const num = (x, digits=1) => typeof x === "number" && Number.isFinite(x)
@@ -259,13 +258,23 @@ async function detail(id,view) {
   const related=e.group_id!=null?events().filter(other=>other.id!==e.id&&other.group_id===e.group_id):[];
   if (related.length) {const head=el("div","section-head");const a=link("Browse group →","#discoveries");a.onclick=()=>{group=String(e.group_id);filter=""};head.append(el("h2","","Compare recordings in this group"),a);view.append(head);cards(related.slice(0,6),view);}
 }
-function statistics(view) {
-  const s=state.stats||{}, grid=el("div","stats");
-  for (const [label,value] of [["Analyzed audio",num(s.hours_analyzed,3)+" h"],["Distinct recording time",elapsed(s.coverage_seconds)],["Source data processed",bytes(s.bytes_processed)],["Historical coverage",num(s.backfill_hours,3)+" h"],["Processing speed",num(s.processing_speed,2)+"× real time"],["Detected events",num(s.events,0)],["Recurring unidentified groups",num(s.recurring_groups,0)],["Human-reviewed events",num(s.reviewed,0)],["Inventoried source files",num(s.inventoried_files,0)],["All-zero intervals",num(s.silent_windows,0)],["Storage used",bytes(s.storage_bytes)],["Worker heartbeat streak",elapsed(s.uptime_seconds)],["Last successful acquisition",when(s.last_acquisition)]]) {
-    const item=el("div","panel metric");item.append(el("small","",label),el("strong","",value));grid.append(item);
+function processingLedger(view) {
+  const s=state?.stats;
+  if(!s)return;
+  const section=el("section","panel pad");
+  section.append(el("h3","","Processing ledger"),facts([
+    ["Source data processed",bytes(s.bytes_processed)],["Historical coverage",num(s.backfill_hours,3)+" h"],
+    ["Processing speed",num(s.processing_speed,2)+"× real time"],["Inventoried source files",num(s.inventoried_files,0)],
+    ["Storage used",bytes(s.storage_bytes)],["Worker heartbeat streak",elapsed(s.uptime_seconds)],
+    ["Last successful acquisition",when(s.last_acquisition)]
+  ]));
+  if(events().length){
+    const counts=new Map();
+    for(const event of events())counts.set(nameOf(event),(counts.get(nameOf(event))||0)+1);
+    section.append(el("h3","","Classification of the latest "+events().length+" candidates"),facts([...counts]));
   }
-  view.append(grid,el("p","muted small","Archive coverage is reported in analyzed hours. The total duration of available archive recordings has yet to be inventoried."),el("p","small muted","Snapshot generated "+when(state.generated_at)));
-  if(events().length){view.append(el("h2","","Classification in the most recent 100 candidates"));const counts=new Map();events().forEach(e=>counts.set(nameOf(e),(counts.get(nameOf(e))||0)+1));view.append(facts([...counts]));}
+  section.append(el("p","figure-note","Ledger updated "+when(state.generated_at)));
+  view.append(section);
 }
 function prose(view,sections) {
   const body=el("div","prose");
@@ -274,7 +283,7 @@ function prose(view,sections) {
 }
 function methodology(view) {prose(view,[
   ["What recurs in the deep ocean?","We measure changes in underwater sound and preserve excerpts for review. Our first question is whether similar narrowband events recur across independent recording dates at the Monterey Accelerated Research System hydrophone.",[["Study protocol",repository+"/blob/main/RESEARCH.md"]]],
-  ["From recording to candidate","The baseline measures spectral energy against local background. Each candidate links its analysis to an archive identifier and recording time. Human review is needed to attribute a source. A quiet analyzed interval contributes to coverage even when it yields no candidates.",[["Experiment results","#statistics"],["Inspect candidates","#discoveries"]]],
+  ["From recording to candidate","The baseline measures spectral energy against local background. Each candidate links its analysis to an archive identifier and recording time. Human review is needed to attribute a source. A quiet analyzed interval contributes to coverage even when it yields no candidates.",[["Coverage and results","#research/coverage"],["Inspect candidates","#discoveries"]]],
   ["Coastal fish choruses","UF310 and UF440 are reference targets from California sanctuary studies. Their coastal recordings and Monterey Bay’s deep offshore observations differ in habitat, propagation and instrumentation. Frequency alone cannot identify a chorus.",[["Kim et al., ICES Journal of Marine Science","https://doi.org/10.1093/icesjms/fsag096"],["Dryad annotations","https://doi.org/10.5061/dryad.q2bvq83sw"]]],
   ["Limits of the observations","The 16 kHz source covers frequencies below 8 kHz. Earlier 2 kHz excerpts cover frequencies below 1 kHz. Weather, vessels, instruments and biological sources can produce overlapping signatures. Audited examples and independent held-out recordings are needed to estimate sensitivity and false alarms.",[["MBARI archive",sourceRegistry],["Pacific Sound documentation","https://docs.mbari.org/pacific-sound/"]]]
 ]);}
@@ -389,7 +398,15 @@ function research(view) {
     researchHeading(view,"Ranked listening notes",notes.length);
     if(notes.length)progressivelyShow(view,notes,"notes",reviewNote,"review-stack");
     else view.append(el("p","empty","No AI field notes have been published yet."));
-    researchQuality(view,researchData.quality);
+    const coverage=el("section");
+    coverage.id="research-coverage";
+    researchQuality(coverage,researchData.quality);
+    processingLedger(coverage);
+    view.append(coverage);
+    if(coverageJump && location.hash==="#research/coverage"){
+      coverageJump=false;
+      requestAnimationFrame(()=>coverage.scrollIntoView());
+    }
     const queue=playableEntries(researchData.queue);
     researchHeading(view,"Awaiting review",queue.length);
     if(queue.length)progressivelyShow(view,queue,"queue",e=>card(e,{showCredit:true}),"catalog");else view.append(el("p","empty","The published review queue is empty."));
@@ -397,6 +414,7 @@ function research(view) {
     view.append(el("p","figure-note","Research snapshot · "+when(researchData.generated_at)));
   }else if(!researchError)view.append(el("p","empty","Loading research notes and recordings…"));
   const methods=el("details","methods"),summary=el("summary","","Research methods and references");methods.append(summary);methodology(methods);view.append(methods);
+  if(!researchData)processingLedger(view);
   if(!researchData&&!researchError)refreshResearch();
 }
 async function refreshResearch() {
@@ -418,6 +436,7 @@ async function refreshResearch() {
   }
 }
 
+let coverageJump=true;
 let state=null, warning="", revision="",pendingRefresh=false;
 function route(){const [page,id]=location.hash.slice(1).split("/");if(["discovery","compare","discoveries"].includes(page)){try{return{page,id:decodeURIComponent(id||"")}}catch{return{page,id:""}}}return{page:Object.hasOwn(pages,page)?page:"observatory"};}
 async function compare(ids,view){
@@ -427,25 +446,26 @@ async function compare(ids,view){
   cards(entries.filter(Boolean),view);view.append(link("Back to discoveries","#discoveries"));
 }
 function render(){
+  if(location.hash==="#statistics")history.replaceState(null,"","#research/coverage");
   const {page,id}=route(), active=["discovery","compare"].includes(page)?"discoveries":page;
   const [k,t,i]=page==="compare"?["Acoustic evidence","Compare recordings","Listen to the selected recordings and inspect their individual spectra."]:page==="discovery"?["Acoustic evidence","Recording detail","Inspect the original-speed excerpt and its provenance."]:pages[active];
   byId("kicker").textContent=k;byId("title").textContent=t;byId("intro").textContent=i;document.title=t+" · Ocean Acoustics";
   for(const a of document.querySelectorAll("nav a")){if(a.hash==="#"+active)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");}
-  byId("notice").textContent=page==="research"?"":warning||(!state&&["discoveries","statistics","observatory"].includes(page)?"Loading observatory data…":"");
+  byId("notice").textContent=page==="research"?"":warning||(!state&&["discoveries","observatory"].includes(page)?"Loading observatory data…":"");
   const view=el("div");byId("view").replaceChildren(view);
   if(page==="research")research(view);
   else if(page==="discovery")detail(id,view);
   else if(page==="compare"&&state)compare(id,view);
-  else if(state)({observatory,discoveries,statistics})[page](view);
+  else if(state)({observatory,discoveries})[page](view);
 }
 async function refresh(){
   try{const res=await fetch("/data/observatory.json",{cache:"no-store",signal:AbortSignal.timeout(15000)});if(!res.ok)throw Error();const next=await res.json();
     if(!next||typeof next.stats!=="object"||!Array.isArray(next.events))throw Error();
     const changed=revision!==next.generated_at||!state||warning;revision=next.generated_at;state=next;warning=Date.now()-Date.parse(next.generated_at)>900000?"Worker snapshot is over 15 minutes old. Showing the last published observation.":"";
-    if(changed && route().page!=="research"){if([...document.querySelectorAll("audio")].some(a=>!a.paused)){pendingRefresh=true;byId("notice").textContent="New observations will appear after playback finishes.";}else render();}
+    if(changed){if([...document.querySelectorAll("audio")].some(a=>!a.paused)){pendingRefresh=true;byId("notice").textContent="New observations will appear after playback finishes.";}else render();}
   }catch{warning=state?"Refresh unavailable. Showing the last loaded observations.":"The observation snapshot is unavailable. Research remains accessible.";if(route().page!=="research")byId("notice").textContent=warning;}
 }
 function refreshAfterPlayback(){if(pendingRefresh&&![...document.querySelectorAll("audio")].some(a=>!a.paused)){pendingRefresh=false;render();}}
 document.addEventListener("ended",refreshAfterPlayback,true);
-window.addEventListener("hashchange",()=>{pendingRefresh=false;render();window.scrollTo(0,0);});
+window.addEventListener("hashchange",()=>{coverageJump=true;pendingRefresh=false;render();window.scrollTo(0,0);});
 render();refresh();setInterval(()=>{refresh();refreshResearch();},60000);
