@@ -38,6 +38,20 @@ def catalog_note(event, note):
                 explanation=explanation, note=None)
 
 
+def listening_picks(candidates):
+    """Favor distinct stations among equally ranked reviews; break remaining ties by review date."""
+    picks=[]
+    locations=set()
+    remaining=list(candidates)
+    while remaining and len(picks)<5:
+        winner=max(remaining,key=lambda c:(c['score'],c['event']['location'] not in locations,
+                                           c['created_at'],c['event']['id']))
+        picks.append(winner)
+        locations.add(winner['event']['location'])
+        remaining.remove(winner)
+    return picks
+
+
 def publish_catalog(con, public, events):
     from worker import json_write
     notes = {r[0]:dict(json.loads(r[1]),model=r[2],created_at=r[3]) for r in con.execute(
@@ -45,15 +59,24 @@ def publish_catalog(con, public, events):
     folder=public/'curation'
     folder.mkdir(exist_ok=True)
     entries=[]
+    candidates=[]
     for e in events:
         if not e.get('audio_url') or not e.get('public_audio',True):
             continue
         item=catalog_note(e,notes.get(e['id']))
+        if note:=item['note']:
+            fields=('id','location','recorded_at','audio_url','boosted_url','boost_gain_db','lowband_url',
+                    'spectrogram_url','source_url','attribution','metadata_url','license','license_url')
+            candidates.append(dict(title=item['title'],observation=item['explanation'],
+                                   score=note.get('listening_interest',note['priority']),
+                                   basis='Listening interest' if 'listening_interest' in note else 'Review priority',
+                                   created_at=note['created_at'],event={k:e.get(k) for k in fields}))
         item['environment']=e.get('environment')
         json_write(folder/(e['id']+'.json'),item)
         entries.append(dict(id=e['id'],genre=item['genre'],mood=item['mood'],kind=item['kind'],
                             reviewed=item['note'] is not None,priority=(item['note'] or {}).get('priority',0),
                             recorded_at=e['recorded_at']))
     entries.sort(key=lambda i:(i['reviewed'],i['priority'],i['recorded_at'],i['id']),reverse=True)
+    json_write(public/'picks.json',listening_picks(candidates))
     json_write(public/'showcase.json',entries)
     return len(entries)

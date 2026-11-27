@@ -59,7 +59,14 @@ async function globeView(view){
   canvas.setAttribute("aria-label","Rotatable globe of acoustic recording stations. Select a station using the adjacent list.");
   const hint=el("div","globe-hint","Drag to rotate · Select a station");
   const zoom=el("div","globe-zoom");
-  map.append(canvas,hint,zoom);const grid=el("div","atlas-grid");grid.append(map,side);panel.append(top,grid);view.append(panel);
+  const hello=el("button","pip-hello"),portrait=el("img");
+  portrait.src="/researcher.webp";portrait.alt="";portrait.width=58;portrait.height=58;
+  hello.append(portrait,el("span","","Hi, I’m Pip! Hear my picks ↓"));
+  hello.onclick=()=>{
+    const picks=document.getElementById("pip-picks");
+    picks?.scrollIntoView({block:"start"});picks?.querySelector("h2")?.focus({preventScroll:true});
+  };
+  map.append(canvas,hint,zoom,hello);const grid=el("div","atlas-grid");grid.append(map,side);panel.append(top,grid);view.append(panel);
   side.append(el("p","small muted","Loading recording stations…"));
   let sites,land,gridPoints;
   try{

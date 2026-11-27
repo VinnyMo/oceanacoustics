@@ -168,8 +168,44 @@ function cards(entries, node,options) {
   for (const e of entries) list.append(card(e,options));
   node.append(list);
 }
+let activePick="";
+async function listeningPicks(view){
+  const section=el("section","panel picks"),header=el("div","picks-head"),heading=el("h2","","Pip’s five most interesting clips");
+  section.id="pip-picks";heading.tabIndex=-1;
+  header.append(heading,link("Explore Pip’s research →","#research"));
+  const body=el("div","picks-body","Loading Pip’s selections…");
+  section.append(header,body);view.append(section);
+  try{
+    const reply=await fetch("/data/picks.json",{cache:"no-store",signal:AbortSignal.timeout(12000)});
+    if(!reply.ok)throw Error();
+    const picks=(await reply.json()).filter(p=>p?.event?.id&&media(p.event.audio_url)).slice(0,5);
+    if(!section.isConnected)return;
+    body.replaceChildren();
+    if(!picks.length){body.textContent="Pip’s first picks will appear after listening reviews are published.";return;}
+    const list=el("ol","pick-list"),feature=el("article","pick-feature");
+    const buttons=[];
+    function show(index){
+      const p=picks[index],e=p.event;
+      activePick=e.id;
+      buttons.forEach((b,i)=>b.setAttribute("aria-pressed",String(i===index)));
+      const title=el("h3");title.append(link(p.title,detailLink(e)));
+      feature.replaceChildren(el("p","label","Pip’s pick "+(index+1)+" · "+p.basis+" "+p.score+"/5"),title,
+        el("p","small muted",[e.location,when(e.recorded_at)].filter(Boolean).join(" · ")),
+        picture(e.spectrogram_url,"Spectrogram of "+p.title,""),el("p","pick-cue",p.observation),
+        player(e),link("Open recording and field notes →",detailLink(e)),credit(e));
+    }
+    picks.forEach((p,i)=>{
+      const li=el("li"),button=el("button","pick-choice");
+      button.append(el("span","pick-rank",String(i+1)),el("span","",p.title));
+      button.onclick=()=>{if(activePick!==p.event.id)show(i);};
+      li.append(button);list.append(li);buttons.push(button);
+    });
+    body.append(list,feature);show(Math.max(0,picks.findIndex(p=>p.event.id===activePick)));
+  }catch{body.textContent="Pip’s selections are temporarily unavailable.";}
+}
 function observatory(view) {
   globeView(view);
+  listeningPicks(view);
   const latest=state.latest, stats=state.stats || {};
   if (!latest) {view.append(el("p","empty","Waiting for the first processed recording."));return;}
   const grid=el("div","observ-grid"), plot=el("section","panel pad"), head=el("div","panel-head");
