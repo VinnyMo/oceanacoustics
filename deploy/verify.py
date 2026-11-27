@@ -8,6 +8,7 @@ BASE = 'https://oceanacoustics.vincentmossman.com'
 
 
 def read(path, **headers):
+    headers['User-Agent'] = 'OceanAcoustics-Health/1.0'
     return urllib.request.urlopen(urllib.request.Request(BASE+path, headers=headers), timeout=20)
 
 
